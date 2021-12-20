@@ -1,0 +1,31 @@
+{
+  "module": {
+    "type": "commonjs"
+  },
+  "env": {
+    "targets": {
+      "node": "14"
+    }
+  },
+  "jsc": {
+    "parser": {
+      "syntax": "typescript",
+      "jsx": false,
+      "dynamicImport": false,
+      "privateMethod": false,
+      "functionBind": false,
+      "exportDefaultFrom": false,
+      "exportNamespaceFrom": false,
+      "decorators": false,
+      "decoratorsBeforeExport": false,
+      "topLevelAwait": false,
+      "importMeta": false
+    },
+    "target": "es2021",
+    "transform": null,
+    "loose": false,
+    "externalHelpers": true,
+    "keepClassNames": true
+  },
+  "sourceMaps": true
+}

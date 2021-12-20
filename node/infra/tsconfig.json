@@ -1,0 +1,22 @@
+{
+  "extends": "@tsconfig/node16/tsconfig.json",
+  "compilerOptions": {
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "strict": true,
+    "allowJs": true,
+    "outDir": "dist",
+    "sourceMap": true
+  },
+  "ts-node": {
+    "transpileOnly": true,
+    "transpiler": "ts-node/transpilers/swc-experimental"
+  },
+  "include": [
+    "src/lib/**/*.ts",
+    "stacks/**/*.ts",
+    "automation/**/*.ts",
+    "src/**/*.ts"
+  ],
+  "exclude": ["node_modules"]
+}

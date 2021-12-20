@@ -1,0 +1,39 @@
+config:
+  OUTPUT-infra-azure-cluster:aksIdentityId: /subscriptions/fe750d86-527b-4dbe-8f83-e59750486692/resourcegroups/pulumi-dev/providers/Microsoft.ManagedIdentity/userAssignedIdentities/aks-identityb5b0e3f8
+  OUTPUT-infra-azure-cluster:clusterName: aks-cluster66aa9c4b
+  OUTPUT-infra-azure-cluster:resourceGroupName: pulumi-dev
+  OUTPUT-infra-azure-cluster:subscriptionId: fe750d86-527b-4dbe-8f83-e59750486692
+  OUTPUT-infra-do-cluster:clusterName: cluster-bea593b
+  OUTPUT-infra-do-cluster:kubeConfig:
+    secure: AAABADw7pjWuROflQgh76kXK1v5lQzZLaviRS7Zb81oq+WMcd/cdG96U0GeoJ3A=
+  OUTPUT-infra-do-cluster:region: tor1
+  OUTPUT-infra-gke-cluster:authorizedIp: 23.116.40.66
+  OUTPUT-infra-gke-cluster:gkeNodeTag: gke-nodes-58b756bbff11e5ec
+  OUTPUT-infra-gke-cluster:location: us-west1-a
+  OUTPUT-infra-gke-cluster:locationType: zone
+  OUTPUT-infra-gke-cluster:name: cluster-63975af
+  OUTPUT-infra-gke-cluster:network: projects/frielforreal-dev-84453c9f/global/networks/default
+  OUTPUT-infra-gke-cluster:project: frielforreal-dev-84453c9f
+  azure-native:clientId: 4f71a77f-5eae-4004-8f39-43fa06d3db47
+  azure-native:clientSecret:
+    secure: AAABAE+d/Z4fR76/aYMrVEYkjEMXTurup4T7eTXB+paTABtqi/pSyd8EmV+FP0M6PLljEuBllH8ZVZtA5Drjf8o9e1Qh
+  azure-native:subscriptionId: fe750d86-527b-4dbe-8f83-e59750486692
+  azure-native:tenantId: e9835a73-1907-4e62-a320-147899847b79
+  digitalocean:token:
+    secure: AAABAGjsilIyBLVxWndSlxTEvZf+EOrFSsMTc6f4lcHViX2mDIkvCKfcw8rXxea6cZ7MxmcwnmxAinIQuQJZvTV+fA6FW4RiEkW4ZkIPGtluTjhMMk3aAkwj1xWtQL0K
+  gcp:region: us-west1
+  gcp:zone: us-west1-a
+  infra-gcp-project:gcpBillingAccountId: 014432-EC7AFA-5D278C
+  infra-gke-cluster:location: us-west1-a
+  infra-gke-cluster:locationType: zone
+  infra-gke-cluster:masterIpv4CidrBlock: 172.31.117.128/28
+  infra-gke-cluster:nodePools:
+  - initialNodeCount: 2
+    machineType: e2-small
+    name: e2-small-pool
+  infra-k8s-trifecta:cloudflareApiToken:
+    secure: AAABAF43Dh1pH8U/zqbvvQUN1eHwBAk9vKZzLZvdoroG6riHPTbdXEjT0vPbcrnnhQA6nCZGMd7IpN8wbKKzCxf2fL6IFyai
+  infra-k8s-trifecta:parentDomain: frielforreal.io
+  kubernetes:kubeClientSettings:
+    burst: 100
+    qps: 10
