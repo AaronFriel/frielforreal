@@ -176,8 +176,9 @@ async function azureUp(sharedProject: Stack) {
     await $`az aks get-credentials --subscription ${subscriptionId}  --resource-group ${resourceGroupName} --name ${clusterName}`;
   });
 
-  additionalConfig['kubernetes:context'] = {
-    value: contextName,
+  additionalConfig['kubernetes:context'] = { value: contextName };
+  additionalConfig['kubernetes:cloudProvider'] = {
+    value: 'azure' as KubernetesCloudProvider,
   };
 
   const k8sTrifectaResult = await stackUp({
@@ -185,7 +186,6 @@ async function azureUp(sharedProject: Stack) {
     stackModule: k8sTrifectaModule,
     stackName: `${STACK_NAME}-azure-${clusterName}`,
     additionalConfig,
-    dryrun: true,
   });
   await mergeConfigOutputs(k8sTrifectaResult);
 }
@@ -213,8 +213,9 @@ async function digitalOceanUp(sharedProject: Stack) {
     console.info(`Getting credentials for GKE cluster ${clusterName}`);
     await $`doctl kubernetes cluster kubeconfig save ${clusterName}`;
   });
-  additionalConfig['kubernetes:context'] = {
-    value: contextName,
+  additionalConfig['kubernetes:context'] = { value: contextName };
+  additionalConfig['kubernetes:cloudProvider'] = {
+    value: 'digitalocean' as KubernetesCloudProvider,
   };
 
   const k8sTrifectaResult = await stackUp({
@@ -222,7 +223,6 @@ async function digitalOceanUp(sharedProject: Stack) {
     stackModule: k8sTrifectaModule,
     stackName: `${STACK_NAME}-do-${clusterName}`,
     additionalConfig,
-    dryrun: true,
   });
   await mergeConfigOutputs(k8sTrifectaResult);
 }
@@ -271,7 +271,6 @@ async function gcpUp(sharedProject: Stack) {
     stackModule: k8sTrifectaModule,
     stackName: `${STACK_NAME}-gcp-${clusterName}`,
     additionalConfig,
-    dryrun: true,
   });
   await mergeConfigOutputs(k8sTrifectaResult);
 }
