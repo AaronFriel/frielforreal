@@ -4,7 +4,7 @@ import {
   LocalWorkspace,
   Stack,
 } from '@pulumi/pulumi/automation';
-import { $ } from 'zx';
+import { YZX } from 'yzx';
 import chalk from 'chalk';
 
 import { INFRA_DIR } from '../../index.js';
@@ -171,9 +171,9 @@ async function azureUp(sharedProject: Stack) {
   const clusterName = azureClusterResult.outputs.clusterName.value;
   const contextName = clusterName;
 
-  await $`kubectl config get-contexts ${contextName}`.catch(async () => {
+  await YZX()`kubectl config get-contexts ${contextName}`.catch(async () => {
     console.info(`Getting credentials for GKE cluster ${clusterName}`);
-    await $`az aks get-credentials --subscription ${subscriptionId}  --resource-group ${resourceGroupName} --name ${clusterName}`;
+    await YZX()`az aks get-credentials --subscription ${subscriptionId}  --resource-group ${resourceGroupName} --name ${clusterName}`;
   });
 
   additionalConfig['kubernetes:context'] = { value: contextName };
@@ -209,9 +209,9 @@ async function digitalOceanUp(sharedProject: Stack) {
   const clusterName = doClusterResult.outputs.clusterName.value;
   const region = doClusterResult.outputs.region.value;
   const contextName = `do-${region}-${clusterName}`;
-  await $`kubectl config get-contexts ${contextName}`.catch(async () => {
+  await YZX()`kubectl config get-contexts ${contextName}`.catch(async () => {
     console.info(`Getting credentials for GKE cluster ${clusterName}`);
-    await $`doctl kubernetes cluster kubeconfig save ${clusterName}`;
+    await YZX()`doctl kubernetes cluster kubeconfig save ${clusterName}`;
   });
   additionalConfig['kubernetes:context'] = { value: contextName };
   additionalConfig['kubernetes:cloudProvider'] = {
@@ -257,9 +257,9 @@ async function gcpUp(sharedProject: Stack) {
     | '--region' = `--${gkeClusterResult.outputs.locationType.value}`;
   const location = gkeClusterResult.outputs.location.value;
   const contextName = `gke_${projectId}_${location}_${clusterName}`;
-  await $`kubectl config get-contexts ${contextName}`.catch(async () => {
+  await YZX()`kubectl config get-contexts ${contextName}`.catch(async () => {
     console.info(`Getting credentials for GKE cluster ${clusterName}`);
-    await $`gcloud --project ${projectId} container clusters get-credentials ${clusterName} ${locationType} ${location}`;
+    await YZX()`gcloud --project ${projectId} container clusters get-credentials ${clusterName} ${locationType} ${location}`;
   });
   additionalConfig['kubernetes:context'] = { value: contextName };
   additionalConfig['kubernetes:cloudProvider'] = {
