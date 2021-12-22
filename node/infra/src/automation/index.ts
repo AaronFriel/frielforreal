@@ -19,6 +19,8 @@ import * as azureClusterModule from '../stacks/azure-cluster/stack';
 import * as doClusterModule from '../stacks/do-cluster/stack';
 import { KubernetesCloudProvider } from '../lib/config';
 
+import { outputFormatter } from './outputFormatter';
+
 const STACK_NAME = process.env.STACK_NAME ?? 'dev';
 const DRY_RUN = process.env.DRY_RUN === 'false' ? false : true;
 
@@ -41,6 +43,8 @@ export async function stackUp<T extends StackModule<unknown>>({
   dryrun?: boolean;
   additionalConfig: ConfigMap;
 }): Promise<StackUpResult<T>> {
+  const formatter = outputFormatter(`${stackModule.projectName}/${stackName}`);
+
   const localProgramArgs: LocalProgramArgs = {
     stackName,
     workDir: stackModule.workDir,
@@ -51,34 +55,34 @@ export async function stackUp<T extends StackModule<unknown>>({
       runtime: 'nodejs',
     },
   });
-  console.log(`Spinning up stack ${stackModule.projectName}/${stackName}`);
+  formatter(`Spinning up stack ${stackModule.projectName}/${stackName}`);
   const sharedConfig = await sharedProject.getAllConfig();
   await stack.setAllConfig({
     ...sharedConfig,
     ...additionalConfig,
   });
 
-  await stack.refresh({
-    onOutput: (message) => console.info(message.trimRight()),
-  });
+  formatter('Refreshing');
+  await stack.refresh();
 
   if (dryrun) {
     const outputs = await stack.outputs();
-    console.info(`Output of stack ${stackModule.projectName}`);
-    console.info(outputs);
     return {
       stack,
       projectName: stackModule.projectName,
       outputs: outputs as StackOutputMap<T>,
     };
   }
-  const result = await stack.up({
-    onOutput: (message) => console.info(message.trimRight()),
-  });
+  formatter('Deploying');
+  const result = await stack.up();
 
   if (result.summary.result !== 'succeeded') {
+    formatter(result.stdout);
+    formatter(result.stderr);
     throw new Error(result.summary.message);
   }
+
+  formatter('Succeeded!');
 
   return {
     stack,
@@ -95,7 +99,9 @@ export async function stackPreview<T extends StackModule<unknown>>(
     stackName,
     workDir: stackModule.workDir,
   });
-  await stack.preview({ onOutput: console.info });
+
+  const formatter = outputFormatter(`${stackModule}/${stackName}`);
+  await stack.preview({ onOutput: formatter });
 
   return {
     stack,
@@ -149,6 +155,7 @@ async function azureUp(sharedProject: Stack) {
   const resourceGroupName = azureClusterResult.outputs.resourceGroupName.value;
   const clusterName = azureClusterResult.outputs.clusterName.value;
   const contextName = clusterName;
+
   await $`kubectl config get-contexts ${contextName}`.catch(async () => {
     console.info(`Getting credentials for GKE cluster ${clusterName}`);
     await $`az aks get-credentials --subscription ${subscriptionId}  --resource-group ${resourceGroupName} --name ${clusterName}`;
