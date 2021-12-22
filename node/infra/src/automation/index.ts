@@ -5,6 +5,7 @@ import {
   Stack,
 } from '@pulumi/pulumi/automation';
 import { $ } from 'zx';
+import chalk from 'chalk';
 
 import { INFRA_DIR } from '../../index.js';
 import {
@@ -82,7 +83,21 @@ export async function stackUp<T extends StackModule<unknown>>({
     throw new Error(result.summary.message);
   }
 
-  formatter('Succeeded!');
+  formatter('Succeeded! Resource summary:');
+  const fmtNum = (num?: number) => `${num}`.padStart(3);
+  const changes = result.summary.resourceChanges;
+  if (changes?.create) {
+    formatter(`${fmtNum(changes?.create)} ${chalk.green('created')}`);
+  }
+  if (changes?.replace) {
+    formatter(`${fmtNum(changes?.replace)} ${chalk.magenta('replaced')}`);
+  }
+  if (changes?.update) {
+    formatter(`${fmtNum(changes?.update)} ${chalk.yellow('updated')}`);
+  }
+  if (changes?.same) {
+    formatter(`${fmtNum(changes?.same)} ${chalk.bold('unchanged')}`);
+  }
 
   return {
     stack,

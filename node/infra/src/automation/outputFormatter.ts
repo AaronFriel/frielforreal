@@ -12,10 +12,11 @@ export function outputFormatter(title: string): Formatter {
   const prefix = prettify(title.padEnd(LONGEST_PREFIX, ' '));
 
   return (msg: string): void => {
-    msg
+    const formattedMessage = msg
       .split('\n')
-      .map((line) => console.info(`${prefix} | ${line.trimRight()}`))
+      .map((line) => `${prefix} | ${line.trimRight()}`)
       .join('\n');
+    console.info(formattedMessage);
   };
 }
 
@@ -34,7 +35,6 @@ const ALL_COLORS = [
   chalk.blueBright,
   chalk.magentaBright,
   chalk.cyanBright,
-  chalk.whiteBright,
 ]
   .map((f) => ({ f, sort: Math.random() }))
   .sort((a, b) => a.sort - b.sort)
