@@ -87,7 +87,7 @@ export async function createExternalDns() {
           containers: [
             {
               name: 'external-dns',
-              image: 'k8s.gcr.io/external-dns/external-dns:v0.7.6',
+              image: 'k8s.gcr.io/external-dns/external-dns:v0.10.2',
               args: [
                 '--source=ingress',
                 '--domain-filter=frielforreal.io',
