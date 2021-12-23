@@ -166,7 +166,6 @@ async function main() {
         value: JSON.stringify(outputs.map((x) => x?.kubeContext)),
       },
     },
-    dryrun: true,
   });
   await mergeConfigOutputs(istioEndpointDiscoveryResult);
 }
