@@ -74,10 +74,10 @@ export async function stack() {
         agentPoolProfiles: [
           {
             name: 'default',
-            osDiskSizeGB: 30,
-            count: 2,
+            osDiskSizeGB: 50,
+            count: 1,
             enableAutoScaling: false,
-            vmSize: 'Standard_B2s',
+            vmSize: 'Standard_D2as_v4',
             osType: 'Linux',
             type: 'VirtualMachineScaleSets',
             mode: 'System',
@@ -85,6 +85,7 @@ export async function stack() {
             availabilityZones: [],
             enableNodePublicIP: false,
             vnetSubnetID: subnet.id,
+            osDiskType: 'Ephemeral',
           },
         ],
         networkProfile: {
@@ -113,7 +114,10 @@ export async function stack() {
           },
         },
       },
-      { ignoreChanges: ['kubernetesVersion'], protect: true },
+      {
+        ignoreChanges: ['kubernetesVersion', 'agentPoolProfiles'],
+        protect: true,
+      },
     );
   });
 

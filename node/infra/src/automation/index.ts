@@ -4,7 +4,7 @@ import {
   LocalWorkspace,
   Stack,
 } from '@pulumi/pulumi/automation';
-import { YZX } from 'yzx';
+import { YZX } from '@frielforreal/yzx';
 import chalk from 'chalk';
 
 import { INFRA_DIR } from '../../index.js';
@@ -15,6 +15,7 @@ import {
 } from '../lib/stackModule';
 import * as gkeClusterModule from '../stacks/gke-cluster/stack';
 import * as k8sTrifectaModule from '../stacks/k8s-trifecta/stack';
+import * as k8sIstioEndpointDiscoveryModule from '../stacks/k8s-istio-endpoint-discovery/stack';
 import * as gcpProjectModule from '../stacks/gcp-project/stack';
 import * as azureClusterModule from '../stacks/azure-cluster/stack';
 import * as doClusterModule from '../stacks/do-cluster/stack';
@@ -148,6 +149,26 @@ async function main() {
 
     throw new Error(errors.map((x) => x.reason.toString()).join('\n'));
   }
+
+  const outputs = results
+    .filter(
+      <T>(x: PromiseSettledResult<T>): x is PromiseFulfilledResult<T> =>
+        x.status === 'fulfilled',
+    )
+    .map((x) => x.value);
+
+  const mergeConfigOutputs = makeMergeConfigOutputs(sharedProject);
+  const istioEndpointDiscoveryResult = await stackUp({
+    sharedProject,
+    stackModule: k8sIstioEndpointDiscoveryModule,
+    additionalConfig: {
+      [`${k8sIstioEndpointDiscoveryModule.projectName}:contexts`]: {
+        value: JSON.stringify(outputs.map((x) => x?.kubeContext)),
+      },
+    },
+    dryrun: true,
+  });
+  await mergeConfigOutputs(istioEndpointDiscoveryResult);
 }
 
 async function azureUp(sharedProject: Stack) {
@@ -188,6 +209,10 @@ async function azureUp(sharedProject: Stack) {
     additionalConfig,
   });
   await mergeConfigOutputs(k8sTrifectaResult);
+
+  return {
+    kubeContext: contextName,
+  };
 }
 
 async function digitalOceanUp(sharedProject: Stack) {
@@ -225,6 +250,10 @@ async function digitalOceanUp(sharedProject: Stack) {
     additionalConfig,
   });
   await mergeConfigOutputs(k8sTrifectaResult);
+
+  return {
+    kubeContext: contextName,
+  };
 }
 
 async function gcpUp(sharedProject: Stack) {
@@ -273,6 +302,10 @@ async function gcpUp(sharedProject: Stack) {
     additionalConfig,
   });
   await mergeConfigOutputs(k8sTrifectaResult);
+
+  return {
+    kubeContext: contextName,
+  };
 }
 
 const makeMergeConfigOutputs =

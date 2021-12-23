@@ -6,6 +6,9 @@
 # compilation result
 /dist
 
+# CA outputs
+.certs
+
 # misc
 .DS_Store
 *.pem

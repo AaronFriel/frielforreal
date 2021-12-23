@@ -24,6 +24,7 @@
         "prettier": "^2.5.1"
     },
     "dependencies": {
+        "@frielforreal/yzx": "^5.0.2",
         "@pulumi/azure-native": "^1.51.0",
         "@pulumi/azuread": "^5.12.0",
         "@pulumi/digitalocean": "^4.10.0",
@@ -36,10 +37,11 @@
         "@pulumi/random": "^4.3.1",
         "@pulumi/tls": "^4.1.0",
         "chalk": "^4.0.0",
-        "into-stream": "^6.0.0",
+        "into-stream": "^5.0.0",
+        "js-yaml": "^4.1.0",
         "moment": "^2.29.1",
         "public-ip": "^4.0.4",
         "typescript": "^4.5.3",
-        "yzx": "^5.0.1"
+        "url-slug": "^3.0.2"
     }
 }
