@@ -72,6 +72,29 @@ export async function createIstio() {
     { dependsOn: [namespace, crds, istio] },
   );
 
+  // https://raw.githubusercontent.com/istio/istio/release-1.12/samples/multicluster/expose-services.yaml
+  new k8s.yaml.ConfigGroup('cross-network-gateway', {
+    yaml: `
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  namespace: istio-system
+  name: cross-network-gateway
+spec:
+  selector:
+    istio: eastwestgateway
+  servers:
+    - port:
+        number: 15443
+        name: tls
+        protocol: TLS
+      tls:
+        mode: AUTO_PASSTHROUGH
+      hosts:
+        - "*.local"
+`.trim(),
+  });
+
   return { istioCrds: crds };
 }
 async function getEastWestGatewayManifest(clusterName: string) {
