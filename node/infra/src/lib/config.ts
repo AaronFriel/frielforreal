@@ -32,7 +32,7 @@ function stackOutputConfig<T extends StackModule<unknown>>(
 
 export const getGkeClusterOutputs = () => stackOutputConfig(gkeCluster);
 
-export type KubernetesCloudProvider = 'aks' | 'gke' | 'digitalocean';
+export type KubernetesCloudProvider = 'aks' | 'gke' | 'digitalocean' | 'lke';
 
 export function getConfig() {
   if (!pulumi.runtime.hasEngine()) {
