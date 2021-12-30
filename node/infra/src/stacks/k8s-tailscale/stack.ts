@@ -14,6 +14,7 @@ export function stackConfig() {
 
   return {
     tailscaleKey: config.requireSecret('tailscaleKey'),
+    enableCrossCluster: config.get('enableCrossCluster') ?? false,
   };
 }
 
@@ -29,7 +30,7 @@ export async function stack() {
   const { clusters } = getConfig().mesh();
   const { clusterName } = getConfig().cloud();
 
-  const { tailscaleKey } = stackConfig();
+  const { tailscaleKey, enableCrossCluster } = stackConfig();
 
   const namespace = new k8s.core.v1.Namespace('tailscale-system', {
     metadata: {
@@ -46,7 +47,7 @@ export async function stack() {
     },
   });
 
-  const clusterRules = clusters.apply((clusters) => {
+  const postUp = clusters.apply((clusters) => {
     let rules = '';
 
     for (const cluster of clusters) {
@@ -59,7 +60,12 @@ export async function stack() {
 `;
     }
 
-    return rules;
+    return pulumi.interpolate`#!/bin/sh
+${rules}
+
+echo "Adding iptables rule for source NAT to remote Kubernetes clusters"
+iptables -A POSTROUTING -t nat --match mark --mark 1 -j SNAT --to-source "$(tailscale --socket=/tmp/tailscaled.sock ip -4)" --wait
+    `;
   });
 
   const configMap = new k8s.core.v1.ConfigMap('tailscale', {
@@ -73,12 +79,7 @@ export async function stack() {
       'add-proxy.sh': readFile(path.join(__dirname, './scripts/add-proxy.sh'), {
         encoding: 'utf-8',
       }),
-      'post-up.sh': pulumi.interpolate`#!/bin/sh
-${clusterRules}
-
-echo "Adding iptables rule for source NAT to remote Kubernetes clusters"
-iptables -A POSTROUTING -t nat --match mark --mark 1 -j SNAT --to-source "$(tailscale --socket=/tmp/tailscaled.sock ip -4)" --wait
-`,
+      'post-up.sh': enableCrossCluster ? postUp : '',
     },
   });
 
