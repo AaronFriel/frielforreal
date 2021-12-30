@@ -34,7 +34,7 @@ deps-prod:
   RUN --mount=type=cache,target=/var/cache/npm npm ci --ignore-scripts --prod
   COPY . .
 
-pulumi-deps:
+deps-pulumi:
   FROM docker.io/library/alpine:3.14.3@sha256:635f0aa53d99017b38d1a0aa5b2082f7812b03e3cdb299103fe77b5c8a07f1d2
   RUN wget https://github.com/pulumi/pulumi/releases/download/v3.20.0/pulumi-v3.20.0-linux-x64.tar.gz && \
       tar -xzvf ./pulumi-v3.20.0-linux-x64.tar.gz
@@ -45,8 +45,41 @@ pulumi-deps:
 docker:
   FROM +deps-prod
   COPY +build/dist /app/dist
+  COPY +deps-pulumi/pulumi/* /usr/local/bin/*
   ENTRYPOINT ["/bin/sh"]
   SAVE IMAGE --push afriel/infra:latest
+
+deps-certstrap:
+  FROM docker.io/library/golang:1.17.5-alpine3.14@sha256:d5871f378da863daa858b6a439e672714dc9d7fb7e8dc8959a3ae4928cca94b5
+  WORKDIR /build
+  GIT CLONE --branch v1.2.0 https://github.com/square/certstrap.git /build
+  RUN go build
+  SAVE ARTIFACT ./certstrap
+
+certstrap:
+  FROM docker.io/library/golang:1.17.5-alpine3.14@sha256:d5871f378da863daa858b6a439e672714dc9d7fb7e8dc8959a3ae4928cca94b5
+  COPY +deps-certstrap/certstrap /usr/bin
+  WORKDIR /build
+  ENTRYPOINT ["/usr/bin/certstrap"]
+  SAVE IMAGE afriel/certstrap
+
+certstrap-init-root-ca:
+  ARG --required ORGANIZATION
+  ARG --required COUNTRY
+  ARG --required COMMON_NAME
+  LOCALLY
+  WITH DOCKER --load=+certstrap
+    RUN docker run --rm -v "$(pwd)/out:/build/out" afriel/certstrap init --passphrase "$PASSPHRASE" --organization "$ORGANIZATION" --country "COUNTRY" --common-name "$COMMON_NAME"
+  END
+
+certstrap-init-intermediate-ca:
+  ARG --required ORGANIZATION
+  ARG --required COUNTRY
+  ARG --required COMMON_NAME
+  LOCALLY
+  WITH DOCKER --load=+certstrap
+    RUN docker run --rm -v "$(pwd)/out:/build/out" afriel/certstrap request-cert --passphrase "$PASSPHRASE" --organization "$ORGANIZATION" --country "COUNTRY" --common-name "$COMMON_NAME"
+  END
 
 npm-audit:
   FROM +deps

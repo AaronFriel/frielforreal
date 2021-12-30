@@ -2,10 +2,10 @@ import * as k8s from '@pulumi/kubernetes';
 import { interpolate } from '@pulumi/pulumi';
 import { RandomUuid } from '@pulumi/random';
 
-import { getConfig } from '../../../lib/config';
+import { stackConfig } from '../stack';
 
-export async function createExternalDns() {
-  const config = getConfig();
+export function createExternalDns() {
+  const k8sTrifectaConfig = stackConfig();
 
   const namespace = new k8s.core.v1.Namespace('admin-external-dns');
 
@@ -32,6 +32,11 @@ export async function createExternalDns() {
         resources: ['nodes'],
         verbs: ['list'],
       },
+      {
+        apiGroups: ['networking.istio.io'],
+        resources: ['gateways', 'virtualservices'],
+        verbs: ['get', 'watch', 'list'],
+      },
     ],
   });
 
@@ -56,7 +61,7 @@ export async function createExternalDns() {
       namespace: namespace.metadata.name,
     },
     stringData: {
-      [CF_API_TOKEN_KEY]: config.k8sTrifectaConfig.cloudflareApiToken,
+      [CF_API_TOKEN_KEY]: k8sTrifectaConfig.cloudflareApiToken,
     },
   });
 
@@ -90,6 +95,7 @@ export async function createExternalDns() {
               image: 'k8s.gcr.io/external-dns/external-dns:v0.10.2',
               args: [
                 '--source=ingress',
+                '--source=istio-gateway',
                 '--domain-filter=frielforreal.io',
                 '--provider=cloudflare',
                 '--registry=txt',

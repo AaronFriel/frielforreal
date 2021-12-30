@@ -4,11 +4,9 @@ import {
   LocalWorkspace,
   Stack,
 } from '@pulumi/pulumi/automation';
-import { YZX } from '@frielforreal/yzx';
 import chalk from 'chalk';
-import pLimit from 'p-limit';
 
-import { INFRA_DIR } from '../../index.js';
+import { INFRA_DIR } from '../../dir.js';
 import {
   getOutputProjectName,
   StackModule,
@@ -16,23 +14,18 @@ import {
 } from '../lib/stackModule';
 import * as gkeClusterModule from '../stacks/gke-cluster/stack';
 import * as k8sTrifectaModule from '../stacks/k8s-trifecta/stack';
-import * as k8sIstioEndpointDiscoveryModule from '../stacks/k8s-istio-endpoint-discovery/stack';
+import * as k8sIstioMeshModule from '../stacks/k8s-istio-mesh/stack';
 import * as gcpProjectModule from '../stacks/gcp-project/stack';
 import * as azureClusterModule from '../stacks/azure-cluster/stack';
 import * as linodeClusterModule from '../stacks/linode-cluster/stack';
 import * as doClusterModule from '../stacks/do-cluster/stack';
-import { KubernetesCloudProvider } from '../lib/config';
+import { CloudKubernetesProvider } from '../lib/cloudConfig';
+import { withKubectl, loadKubeConfig } from '../lib/kubectl';
 
 import { outputFormatter } from './outputFormatter';
 
 const STACK_NAME = process.env.STACK_NAME ?? 'dev';
 const DRY_RUN = process.env.DRY_RUN === 'false' ? false : true;
-
-/**
- * Commands that interact with kube config should run in closures invoked by this function, to
- * ensure that no race conditions occur editing the config file.
- */
-const kubeCriticalSection = pLimit(1);
 
 interface StackUpResult<T> {
   stack: Stack;
@@ -171,16 +164,16 @@ async function main() {
     .map((x) => x.value);
 
   const mergeConfigOutputs = makeMergeConfigOutputs(sharedProject);
-  const istioEndpointDiscoveryResult = await stackUp({
+  const istioMeshResult = await stackUp({
     sharedProject,
-    stackModule: k8sIstioEndpointDiscoveryModule,
+    stackModule: k8sIstioMeshModule,
     additionalConfig: {
-      [`${k8sIstioEndpointDiscoveryModule.projectName}:contexts`]: {
+      [`${k8sIstioMeshModule.projectName}:contexts`]: {
         value: JSON.stringify(outputs.map((x) => x?.kubeContext)),
       },
     },
   });
-  await mergeConfigOutputs(istioEndpointDiscoveryResult);
+  await mergeConfigOutputs(istioMeshResult);
 }
 
 async function azureUp(sharedProject: Stack): Promise<ClusterUpResult> {
@@ -204,16 +197,18 @@ async function azureUp(sharedProject: Stack): Promise<ClusterUpResult> {
   const clusterName = azureClusterResult.outputs.clusterName.value;
   const contextName = clusterName;
 
-  await kubeCriticalSection(async () => {
-    await YZX()`kubectl config get-contexts ${contextName}`.catch(async () => {
+  await withKubectl(async ($) => {
+    try {
+      await $`kubectl config get-contexts ${contextName}`;
+    } catch {
       console.info(`Getting credentials for GKE cluster ${clusterName}`);
-      await YZX()`az aks get-credentials --subscription ${subscriptionId}  --resource-group ${resourceGroupName} --name ${clusterName}`;
-    });
+      await $`az aks get-credentials --subscription ${subscriptionId}  --resource-group ${resourceGroupName} --name ${clusterName}`;
+    }
   });
 
   additionalConfig['kubernetes:context'] = { value: contextName };
   additionalConfig['kubernetes:cloudProvider'] = {
-    value: 'azure' as KubernetesCloudProvider,
+    value: 'azure' as CloudKubernetesProvider,
   };
 
   const k8sTrifectaResult = await stackUp({
@@ -249,15 +244,17 @@ async function digitalOceanUp(sharedProject: Stack): Promise<ClusterUpResult> {
   const region = doClusterResult.outputs.region.value;
   const contextName = `do-${region}-${clusterName}`;
 
-  await kubeCriticalSection(async () => {
-    await YZX()`kubectl config get-contexts ${contextName}`.catch(async () => {
+  await withKubectl(async ($) => {
+    try {
+      await $`kubectl config get-contexts ${contextName}`;
+    } catch {
       console.info(`Getting credentials for GKE cluster ${clusterName}`);
-      await YZX()`doctl kubernetes cluster kubeconfig save ${clusterName}`;
-    });
+      await $`doctl kubernetes cluster kubeconfig save ${clusterName}`;
+    }
   });
   additionalConfig['kubernetes:context'] = { value: contextName };
   additionalConfig['kubernetes:cloudProvider'] = {
-    value: 'digitalocean' as KubernetesCloudProvider,
+    value: 'digitalocean' as CloudKubernetesProvider,
   };
 
   const k8sTrifectaResult = await stackUp({
@@ -304,15 +301,17 @@ async function gcpUp(sharedProject: Stack): Promise<ClusterUpResult> {
   const location = gkeClusterResult.outputs.location.value;
   const contextName = `gke_${projectId}_${location}_${clusterName}`;
 
-  await kubeCriticalSection(async () => {
-    await YZX()`kubectl config get-contexts ${contextName}`.catch(async () => {
+  await withKubectl(async ($) => {
+    try {
+      await $`kubectl config get-contexts ${contextName}`;
+    } catch {
       console.info(`Getting credentials for GKE cluster ${clusterName}`);
-      await YZX()`gcloud --project ${projectId} container clusters get-credentials ${clusterName} ${locationType} ${location}`;
-    });
+      await $`gcloud --project ${projectId} container clusters get-credentials ${clusterName} ${locationType} ${location}`;
+    }
   });
   additionalConfig['kubernetes:context'] = { value: contextName };
   additionalConfig['kubernetes:cloudProvider'] = {
-    value: 'gke' as KubernetesCloudProvider,
+    value: 'gke' as CloudKubernetesProvider,
   };
 
   const k8sTrifectaResult = await stackUp({
@@ -345,11 +344,11 @@ async function linodeUp(sharedProject: Stack): Promise<ClusterUpResult> {
   const contextName = linodeClusterResult.outputs.contextName.value;
   const clusterName = linodeClusterResult.outputs.clusterName.value;
 
-  await mergeKubeConfig(kubeconfig);
+  await loadKubeConfig(kubeconfig);
 
   additionalConfig['kubernetes:context'] = { value: contextName };
   additionalConfig['kubernetes:cloudProvider'] = {
-    value: 'lke' as KubernetesCloudProvider,
+    value: 'lke' as CloudKubernetesProvider,
   };
 
   const k8sTrifectaResult = await stackUp({
@@ -382,18 +381,3 @@ const makeMergeConfigOutputs =
   };
 
 main();
-async function mergeKubeConfig(kubeconfig: string) {
-  await kubeCriticalSection(async () => {
-    const $ = YZX();
-    $.verbose = false;
-    $`
-KUBECONFIG_DEFAULT="$HOME/.kube/config"
-TMPCONFIG=$(mktemp)
-TMPOUTPUT=$(mktemp)
-echo -n ${kubeconfig} > "$TMPCONFIG"
-KUBECONFIG="$KUBECONFIG_DEFAULT:$TMPCONFIG" kubectl config view --flatten > $TMPOUTPUT
-mv $TMPOUTPUT $KUBECONFIG_DEFAULT
-rm $TMPCONFIG
-`;
-  });
-}

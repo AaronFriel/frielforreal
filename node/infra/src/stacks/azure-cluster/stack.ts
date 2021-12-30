@@ -10,10 +10,6 @@ import * as publicIp from 'public-ip';
 export const workDir = __dirname;
 export const projectName = 'infra-azure-cluster';
 
-export function config() {
-  return {};
-}
-
 export async function stack() {
   if (!runtime.hasEngine()) {
     return;

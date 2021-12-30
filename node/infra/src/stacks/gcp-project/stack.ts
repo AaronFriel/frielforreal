@@ -9,11 +9,13 @@ import { getConfig } from '../../lib/config';
 
 export const workDir = __dirname;
 export const projectName = 'infra-gcp-project';
-export function config() {
+export function stackConfig() {
   const config = new pulumi.Config(projectName);
 
   return {
-    billingAccountId: config.get('gcpBillingAccountId'),
+    billingAccountId: config.get('optionalBillingAccountId'),
+    folderId: config.get('optionalFolderId'),
+    projectName: config.get('optionalProjectName'),
   };
 }
 
@@ -29,16 +31,22 @@ export async function stack() {
     return;
   }
 
-  const config = getConfig();
+  const localConfig = stackConfig();
+  const globalConfig = getConfig();
 
   const suffix = new random.RandomId('project-id', { byteLength: 4 });
 
-  const activeProject = config.gcp.project;
+  const gcpConfig = globalConfig.gcp();
+  const activeProject = gcpConfig.project;
 
-  const billingAccount = await getBillingAccount({
-    displayName: 'My Billing Account',
-    open: true,
-  });
+  const billingAccountId =
+    localConfig.billingAccountId ??
+    (
+      await getBillingAccount({
+        displayName: 'My Billing Account',
+        open: true,
+      })
+    ).id;
 
   for (const api of apis) {
     new Service(`${api}`, {
@@ -48,17 +56,17 @@ export async function stack() {
     });
   }
 
+  const projectName = localConfig.projectName ?? pulumi.getStack();
   const project = new Project(
     'project',
     {
-      projectId: pulumi.interpolate`frielforreal-${pulumi.getStack()}-${
-        suffix.hex
-      }`,
-      name: pulumi.interpolate`frielforreal-${pulumi.getStack()}`,
+      projectId: pulumi.interpolate`${projectName}-${suffix.hex}`,
+      folderId: localConfig.folderId,
+      name: projectName,
       autoCreateNetwork: false,
-      billingAccount: billingAccount.id,
+      billingAccount: billingAccountId,
     },
-    { ignoreChanges: ['folderId', 'orgId'] },
+    { ignoreChanges: ['orgId', 'folderId'] }, // cannot set both orgId and folderId on update, bug?
   );
 
   for (const api of apis) {
@@ -79,7 +87,7 @@ export async function stack() {
     {
       network: network.selfLink,
       project: project.projectId,
-      region: config.gcp.region,
+      region: gcpConfig.region,
       nats: [
         {
           name: 'default-nat',

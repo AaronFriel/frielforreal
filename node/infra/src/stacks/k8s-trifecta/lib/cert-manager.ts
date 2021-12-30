@@ -4,29 +4,34 @@ import * as k8s from '@pulumi/kubernetes';
 import { Resource } from '@pulumi/pulumi';
 
 import { gkeFirewallRule } from '../../../lib/gcp-util/gkeFirewallRule';
-import { getConfig, getGkeClusterOutputs } from '../../../lib/config';
+import { getConfig } from '../../../lib/config';
+import { stackConfig } from '../stack';
 
 import { cloudflareDns01Issuer } from './constants';
 
-export async function createCertManager() {
-  const namespace = new k8s.core.v1.Namespace('admin-cert-manager');
-
+export function createCertManager() {
   const config = getConfig();
-  const gkeCluster = getGkeClusterOutputs();
+
+  const cloudConfig = config.cloud();
+  const k8sTrifectaConfig = stackConfig();
 
   const firewallRules: Resource[] = [];
-  if (config.k8s.cloudProvider === 'gke') {
+  if (cloudConfig.kubernetesProvider === 'gke') {
+    const gkeClusterConfig = config.gkeCluster();
     firewallRules.push(
       gkeFirewallRule('cert-manager', {
-        gkeMasterIpv4CidrBlock: config.gkeCluster.masterIpv4CidrBlock,
+        gkeMasterIpv4CidrBlock: gkeClusterConfig.masterIpv4CidrBlock,
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        gkeNetwork: gkeCluster('network')!,
-        gkeNodeTag: gkeCluster('gkeNodeTag'),
+        gkeNetwork: cloudConfig.gkeNetwork!,
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+        gkeNodeTag: cloudConfig.gkeNodeTag!,
         protocol: 'TCP',
         ports: ['10250'],
       }),
     );
   }
+
+  const namespace = new k8s.core.v1.Namespace('admin-cert-manager');
 
   const crds = new k8s.yaml.ConfigFile('cert-manager-crds', {
     file: path.join(__dirname, 'cert-manager-crds.yaml'),
@@ -56,7 +61,7 @@ export async function createCertManager() {
       namespace: namespace.metadata.name,
     },
     stringData: {
-      [CF_API_TOKEN_KEY]: config.k8sTrifectaConfig.cloudflareApiToken,
+      [CF_API_TOKEN_KEY]: k8sTrifectaConfig.cloudflareApiToken,
     },
   });
 

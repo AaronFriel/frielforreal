@@ -7,6 +7,7 @@ import * as publicIp from 'public-ip';
 import moment = require('moment');
 
 import { getConfig } from '../../lib/config';
+import { assertOutputNonNull } from '../../lib/output';
 
 export const workDir = __dirname;
 export const projectName = 'infra-gke-cluster';
@@ -17,7 +18,7 @@ type NodePoolConfig = {
   initialNodeCount?: number;
 };
 
-export function config() {
+export function stackConfig() {
   const config = new pulumi.Config(projectName);
 
   return {
@@ -33,12 +34,13 @@ export async function stack() {
     return;
   }
 
-  const config = getConfig();
+  const localConfig = stackConfig();
+  const globalConfig = getConfig();
 
   const gkeNodeTagSuffix = new random.RandomId('gke-node-tag', {
     byteLength: 8,
   }).hex;
-  const gkeNodeTag = pulumi.interpolate`gke-nodes-${gkeNodeTagSuffix}`;
+  const nodeTag = pulumi.interpolate`gke-nodes-${gkeNodeTagSuffix}`;
 
   const ipv4Ip = await publicIp.v4();
   const boundKey = gkeKmsKey();
@@ -46,7 +48,7 @@ export async function stack() {
   const gkeCluster = new Cluster(
     'cluster',
     {
-      location: config.gkeCluster.location,
+      location: localConfig.location,
       releaseChannel: { channel: 'REGULAR' },
       loggingConfig: {
         enableComponents: ['SYSTEM_COMPONENTS', 'WORKLOADS'],
@@ -64,7 +66,7 @@ export async function stack() {
       privateClusterConfig: {
         enablePrivateEndpoint: false,
         enablePrivateNodes: true,
-        masterIpv4CidrBlock: config.gkeCluster.masterIpv4CidrBlock,
+        masterIpv4CidrBlock: localConfig.masterIpv4CidrBlock,
       },
       masterAuthorizedNetworksConfig: {
         cidrBlocks: [
@@ -80,45 +82,72 @@ export async function stack() {
     { ignoreChanges: ['nodePools', 'nodeConfig'] },
   );
 
-  for (const nodePoolConfig of config.gkeCluster.nodePools) {
+  for (const nodePoolConfig of localConfig.nodePools) {
     new NodePool(
       nodePoolConfig.name,
       {
         cluster: gkeCluster.name,
-        location: config.gkeCluster.location,
+        location: localConfig.location,
         initialNodeCount: nodePoolConfig.initialNodeCount,
         nodeConfig: {
           imageType: 'cos_containerd',
           machineType: nodePoolConfig.machineType,
-          tags: [gkeNodeTag],
+          tags: [nodeTag],
         },
       },
       { ignoreChanges: ['initialNodeCount'] },
     );
   }
 
+  const contextName =
+    globalConfig.cloud().contextName ??
+    pulumi.interpolate`gke-${gkeCluster.name}`;
+
+  const kubeconfig = pulumi
+    .secret(
+      pulumi.interpolate`
+apiVersion: v1
+kind: Config
+clusters:
+- name: gke-${contextName}
+  cluster:
+    server: https://${gkeCluster.endpoint}
+    certificate-authority-data: ${gkeCluster.masterAuth.clusterCaCertificate}
+users:
+- name: gke-${contextName}
+  user:
+    auth-provider:
+      name: gcp
+contexts:
+- context:
+    cluster: gke-${contextName}
+    user: gke-${contextName}
+  name: gke-${contextName}
+current-context: gke-${contextName}
+`,
+    )
+    .apply((x) => x.trim());
+
   return {
     name: gkeCluster.name,
     location: gkeCluster.location,
-    locationType: config.gkeCluster.locationType,
+    locationType: localConfig.locationType,
     project: gkeCluster.project,
     authorizedIp: ipv4Ip,
-    network: gkeCluster.network,
-    gkeNodeTag,
+    network: assertOutputNonNull(gkeCluster.network),
+    kubeconfig,
+    nodeTag,
   };
 }
 
 function gkeKmsKey() {
   const config = getConfig();
+  const gcpConfig = config.gcp();
 
-  const currentProject = Project.get(
-    'current-project',
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    config.gcp.project!,
-  );
+  const currentProject = Project.get('current-project', gcpConfig.project);
 
   const keyring = new KeyRing('gke-keyring', {
-    location: config.gcp.region,
+    location: gcpConfig.region,
   });
 
   const key = new CryptoKey('gke-key', {

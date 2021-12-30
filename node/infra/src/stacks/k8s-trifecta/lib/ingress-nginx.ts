@@ -3,7 +3,8 @@ import * as nginx from '@pulumi/kubernetes-ingress-nginx';
 import * as pulumi from '@pulumi/pulumi';
 
 import { gkeFirewallRule } from '../../../lib/gcp-util/gkeFirewallRule';
-import { getConfig, getGkeClusterOutputs } from '../../../lib/config';
+import { getConfig } from '../../../lib/config';
+import { stackConfig } from '../stack';
 
 import { cloudflareDns01Issuer } from './constants';
 
@@ -14,14 +15,17 @@ export async function createIngressNginx({
 }) {
   const config = getConfig();
 
-  const gkeCluster = getGkeClusterOutputs();
+  const k8sTrifectaConfig = stackConfig();
 
-  if (config.k8s.cloudProvider === 'gke') {
+  const cloudConfig = config.cloud();
+  if (cloudConfig.kubernetesProvider === 'gke') {
+    const gkeClusterConfig = config.gkeCluster();
     gkeFirewallRule('ingress-nginx', {
-      gkeMasterIpv4CidrBlock: config.gkeCluster.masterIpv4CidrBlock,
+      gkeMasterIpv4CidrBlock: gkeClusterConfig.masterIpv4CidrBlock,
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      gkeNetwork: gkeCluster('network')!,
-      gkeNodeTag: gkeCluster('gkeNodeTag'),
+      gkeNetwork: cloudConfig.gkeNetwork!,
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      gkeNodeTag: cloudConfig.gkeNodeTag!,
       protocol: 'TCP',
       ports: ['8443'],
     });
@@ -36,7 +40,7 @@ export async function createIngressNginx({
       namespace: namespace.metadata.name,
     })
     .apply(({ namespace }) => {
-      const parentDomain = config.k8sTrifectaConfig.parentDomain;
+      const parentDomain = k8sTrifectaConfig.parentDomain;
       const wildcardDomain = `*.${parentDomain}`;
       new k8s.apiextensions.CustomResource(
         'ingress-nginx-tls-cert-prod',
@@ -80,6 +84,7 @@ export async function createIngressNginx({
           },
           resources: {
             requests: {
+              cpu: '5m',
               memory: '90Mi',
             },
           },

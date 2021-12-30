@@ -21,7 +21,7 @@
       "topLevelAwait": false,
       "importMeta": false
     },
-    "target": "es2021",
+    "target": "es2020",
     "transform": null,
     "loose": false,
     "externalHelpers": true,

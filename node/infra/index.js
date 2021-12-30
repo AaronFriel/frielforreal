@@ -1,1 +1,3 @@
-module.exports.INFRA_DIR = __dirname;
+const { stack } = require('./dist/meta-stack');
+
+module.exports = stack();

@@ -25,6 +25,7 @@
     },
     "dependencies": {
         "@frielforreal/yzx": "^5.0.2",
+        "@kubernetes/client-node": "^0.16.1",
         "@pulumi/azure-native": "^1.51.0",
         "@pulumi/azuread": "^5.12.0",
         "@pulumi/digitalocean": "^4.10.0",
@@ -40,6 +41,7 @@
         "chalk": "^4.0.0",
         "into-stream": "^5.0.0",
         "js-yaml": "^4.1.0",
+        "lazy-value": "^2.0.0",
         "moment": "^2.29.1",
         "p-limit": "^3.1.0",
         "public-ip": "^4.0.4",

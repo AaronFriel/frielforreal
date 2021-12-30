@@ -1,0 +1,58 @@
+ kubectl delete -f - <<EOF
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: kubernetes
+spec:
+  selector:
+    istio: ingressgateway # use Istio default gateway implementation
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - 'cluster1.mesh.example'
+    tls:
+      httpsRedirect: true # sends 301 redirect for http requests
+  - port:
+      number: 443
+      name: https
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: wildcard-tls
+    hosts:
+    - 'cluster1.mesh.example'
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: kubernetes
+spec:
+  hosts:
+  - cluster1.mesh.example
+  gateways:
+  - kubernetes
+  http:
+  - match:
+    - uri:
+        prefix: /
+    route:
+    - destination:
+        host: kubernetes.default.svc.cluster.local
+        port:
+          number: 443
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: kubernetes
+spec:
+  host: kubernetes.default.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: SIMPLE
+      caCertificates: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+      sni: kubernetes.default.svc.cluster.local
+EOF

@@ -13,9 +13,6 @@
     "transpiler": "ts-node/transpilers/swc-experimental"
   },
   "include": [
-    "src/lib/**/*.ts",
-    "stacks/**/*.ts",
-    "automation/**/*.ts",
     "src/**/*.ts"
   ],
   "exclude": ["node_modules"]

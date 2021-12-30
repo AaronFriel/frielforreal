@@ -6,10 +6,6 @@ import * as k8s from '@pulumi/kubernetes';
 export const workDir = __dirname;
 export const projectName = 'infra-k8s-cockroachlabs-operator';
 
-export function config() {
-  return {};
-}
-
 export async function stack() {
   if (!pulumi.runtime.hasEngine()) {
     return;

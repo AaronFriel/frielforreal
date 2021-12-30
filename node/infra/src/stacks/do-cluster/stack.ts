@@ -5,10 +5,6 @@ import { RandomId } from '@pulumi/random';
 export const workDir = __dirname;
 export const projectName = 'infra-do-cluster';
 
-export function config() {
-  return {};
-}
-
 export async function stack() {
   if (!pulumi.runtime.hasEngine()) {
     return;

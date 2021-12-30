@@ -1,5 +1,7 @@
 import * as pulumi from '@pulumi/pulumi';
 
+import { getConfig } from '../../lib/config';
+
 import { createCertManager } from './lib/cert-manager';
 import { createExternalDns } from './lib/external-dns';
 import { createIngressNginx } from './lib/ingress-nginx';
@@ -8,7 +10,7 @@ import { createIstio } from './lib/istio';
 export const workDir = __dirname;
 export const projectName = 'infra-k8s-trifecta';
 
-export function config() {
+export function stackConfig() {
   const config = new pulumi.Config(projectName);
 
   return {
@@ -26,13 +28,17 @@ export async function stack() {
     return;
   }
 
-  await createIstio();
+  const { certManagerCrds } = createCertManager();
 
-  const { certManagerCrds } = await createCertManager();
+  createExternalDns();
 
-  await createExternalDns();
+  createIngressNginx({ certManagerCrds });
 
-  await createIngressNginx({ certManagerCrds });
+  const { istioRemoteSecretData } = createIstio({
+    certManagerCrds,
+  });
 
-  return {};
+  return {
+    istioRemoteSecretData,
+  };
 }
