@@ -1,35 +1,18 @@
 import * as path from 'path';
 
 import * as k8s from '@pulumi/kubernetes';
-import { Resource } from '@pulumi/pulumi';
 
-import { gkeFirewallRule } from '../../../lib/gcp-util/gkeFirewallRule';
-import { getConfig } from '../../../lib/config';
 import { stackConfig } from '../stack';
+import { kubernetesWebhookFirewallRule } from '../../../lib/kubernetes-util';
 
 import { cloudflareDns01Issuer } from './constants';
 
 export function createCertManager() {
-  const config = getConfig();
-
-  const cloudConfig = config.cloud();
   const k8sTrifectaConfig = stackConfig();
 
-  const firewallRules: Resource[] = [];
-  if (cloudConfig.kubernetesProvider === 'gke') {
-    const gkeClusterConfig = config.gkeCluster();
-    firewallRules.push(
-      gkeFirewallRule('cert-manager', {
-        gkeMasterIpv4CidrBlock: gkeClusterConfig.masterIpv4CidrBlock,
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        gkeNetwork: cloudConfig.gkeNetwork!,
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        gkeNodeTag: cloudConfig.gkeNodeTag!,
-        protocol: 'TCP',
-        ports: ['10250'],
-      }),
-    );
-  }
+  const firewallRules = kubernetesWebhookFirewallRule('cert-manager', 'TCP', [
+    10250,
+  ]);
 
   const namespace = new k8s.core.v1.Namespace('admin-cert-manager');
 

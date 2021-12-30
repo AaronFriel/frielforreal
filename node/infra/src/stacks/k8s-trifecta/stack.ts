@@ -1,7 +1,5 @@
 import * as pulumi from '@pulumi/pulumi';
 
-import { getConfig } from '../../lib/config';
-
 import { createCertManager } from './lib/cert-manager';
 import { createExternalDns } from './lib/external-dns';
 import { createIngressNginx } from './lib/ingress-nginx';

@@ -4,8 +4,8 @@ import * as pulumi from '@pulumi/pulumi';
 
 import { getConfig } from '../../../lib/config';
 import { stackConfig } from '../stack';
-import { gkeFirewallRule } from '../../../lib/gcp-util/gkeFirewallRule';
 import { getIstioOperatorManifest } from '../../../lib/istio-util';
+import { kubernetesWebhookFirewallRule } from '../../../lib/kubernetes-util';
 
 import { crdOnly, nonCrdOnly } from './crdUtil';
 import { cloudflareDns01Issuer } from './constants';
@@ -26,21 +26,9 @@ export function createIstio({
 
   const clusterFqdn = `${clusterName}.mesh.${parentDomain}`;
 
-  const firewallRules: pulumi.Resource[] = [];
-  if (cloudConfig.kubernetesProvider === 'gke') {
-    const gkeClusterConfig = config.gkeCluster();
-    firewallRules.push(
-      gkeFirewallRule('istio-webhooks', {
-        gkeMasterIpv4CidrBlock: gkeClusterConfig.masterIpv4CidrBlock,
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        gkeNetwork: cloudConfig.gkeNetwork!,
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        gkeNodeTag: cloudConfig.gkeNodeTag!,
-        protocol: 'TCP',
-        ports: ['15017'],
-      }),
-    );
-  }
+  const firewallRules = kubernetesWebhookFirewallRule('istio-webhooks', 'TCP', [
+    15017,
+  ]);
 
   // For Istio's mesh implementation, we must permit requests from other clusters, and to harden the
   // cluster, we will use JWT validation.

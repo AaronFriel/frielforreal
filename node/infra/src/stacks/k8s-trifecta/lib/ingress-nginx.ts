@@ -2,9 +2,8 @@ import * as k8s from '@pulumi/kubernetes';
 import * as nginx from '@pulumi/kubernetes-ingress-nginx';
 import * as pulumi from '@pulumi/pulumi';
 
-import { gkeFirewallRule } from '../../../lib/gcp-util/gkeFirewallRule';
-import { getConfig } from '../../../lib/config';
 import { stackConfig } from '../stack';
+import { kubernetesWebhookFirewallRule } from '../../../lib/kubernetes-util';
 
 import { cloudflareDns01Issuer } from './constants';
 
@@ -13,23 +12,9 @@ export async function createIngressNginx({
 }: {
   certManagerCrds: pulumi.Resource;
 }) {
-  const config = getConfig();
-
   const k8sTrifectaConfig = stackConfig();
 
-  const cloudConfig = config.cloud();
-  if (cloudConfig.kubernetesProvider === 'gke') {
-    const gkeClusterConfig = config.gkeCluster();
-    gkeFirewallRule('ingress-nginx', {
-      gkeMasterIpv4CidrBlock: gkeClusterConfig.masterIpv4CidrBlock,
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      gkeNetwork: cloudConfig.gkeNetwork!,
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      gkeNodeTag: cloudConfig.gkeNodeTag!,
-      protocol: 'TCP',
-      ports: ['8443'],
-    });
-  }
+  kubernetesWebhookFirewallRule('ingress-nginx', 'TCP', [8443]);
 
   const namespace = new k8s.core.v1.Namespace('admin-ingress-nginx');
 

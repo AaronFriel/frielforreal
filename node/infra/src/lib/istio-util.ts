@@ -5,15 +5,29 @@ import yaml from 'js-yaml';
 
 import { CloudKubernetesProvider } from './cloudConfig';
 
+interface IstioOperatorManifestOptions {
+  /**
+   * Short name of cluster, e.g.: "finer-redfish"
+   */
+  clusterName: string;
+  /**
+   * Cloud provider, e.g.: "gke"
+   */
+  cloudProvider: CloudKubernetesProvider | undefined;
+  /**
+   * Kubernetes Cluster CA certificate.
+   */
+  clusterCaCrt: pulumi.Input<string>;
+}
+
+/**
+ * Uses `istioctl manifest generate` to create a string containing YAML resources to deploy.
+ */
 export function getIstioOperatorManifest({
   clusterName,
   cloudProvider,
   clusterCaCrt,
-}: {
-  clusterName: string;
-  cloudProvider: CloudKubernetesProvider | undefined;
-  clusterCaCrt: pulumi.Input<string>;
-}) {
+}: IstioOperatorManifestOptions): pulumi.Output<string> {
   const $ = YZX();
   $.verbose = false;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -32,6 +46,7 @@ export function getIstioOperatorManifest({
       profile: 'demo',
       values: {
         pilot: {
+          // Required to securely expose the Kubernetes API over an Istio ingress gateway.
           jwksResolverExtraRootCA: clusterCaCrt,
         },
         global: {

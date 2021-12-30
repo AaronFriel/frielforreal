@@ -103,17 +103,6 @@ async function withTemporaryStack(
   };
 }
 
-async function applyConfig(
-  stack: automation.Stack,
-  initialConfig: automation.ConfigMap,
-  props: LocalPulumiProgramInputs,
-) {
-  await stack.setAllConfig({
-    ...initialConfig,
-    ...props.config,
-  });
-}
-
 const provider: dynamic.ResourceProvider = {
   async check(olds, news): Promise<dynamic.CheckResult> {
     if (olds?.projectName && olds?.stackName && getId(olds) !== getId(news)) {
