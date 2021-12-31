@@ -6,10 +6,20 @@ import { secret } from '@pulumi/pulumi';
 export const workDir = __dirname;
 export const projectName = 'infra-linode-cluster';
 
+export function config() {
+  const config = new pulumi.Config();
+
+  return {
+    region: config.require('region'),
+  };
+}
+
 export async function stack() {
   if (!pulumi.runtime.hasEngine()) {
     return;
   }
+
+  const { region } = config();
 
   const label = new RandomPet('cluster-label', {
     separator: '-',
@@ -20,7 +30,7 @@ export async function stack() {
   const cluster = new linode.LkeCluster('cluster', {
     k8sVersion: '1.22',
     label,
-    region: 'us-central',
+    region,
     controlPlane: {
       highAvailability: false,
     },
@@ -33,7 +43,9 @@ export async function stack() {
   });
 
   return {
-    kubeconfig: secret(cluster.kubeconfig),
+    kubeconfig: secret(cluster.kubeconfig).apply((base64data) =>
+      base64data ? Buffer.from(base64data, 'base64').toString('utf-8') : '',
+    ),
     clusterName: cluster.label,
     contextName: pulumi.interpolate`lke${cluster.id}-ctx`,
   };

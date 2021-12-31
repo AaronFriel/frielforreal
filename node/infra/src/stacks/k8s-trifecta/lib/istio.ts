@@ -1,3 +1,5 @@
+import * as timers from 'timers/promises';
+
 import * as k8s from '@pulumi/kubernetes';
 import * as urlSlug from 'url-slug';
 import * as pulumi from '@pulumi/pulumi';
@@ -140,7 +142,7 @@ export function createIstio({
     clusterName,
   });
 
-  pulumi.output(crds.resources).apply(() => exposeApiServer(clusterFqdn));
+  pulumi.output(crds.resources).apply(() => exposeApiServer(crds, clusterFqdn));
 
   return { istioCrds: crds, istioRemoteSecretData, istioNamespace: namespace };
 }
@@ -169,17 +171,27 @@ function createRemoteSecret({
     },
     {
       ignoreChanges: ['data'],
-      dependsOn: Object.values(istio.resources),
+      dependsOn: [istio, ...Object.values(istio.resources)],
     },
   );
 
   const istioReaderToken = pulumi
     .output(meshReaderSecret.data)
-    .apply((secretData) =>
-      secretData['token']
-        ? Buffer.from(secretData['token'], 'base64').toString('utf-8')
-        : 'undefined',
-    );
+    .apply(async (_) => {
+      // The Kubernetes TokenController runs asynchronously, wait a second, then pull the token off the secret:
+      await timers.setTimeout(1000);
+      const readSecret = k8s.core.v1.Secret.get(
+        `read-remote-mesh-reader-token`,
+        pulumi.interpolate`${namespace.metadata.name}/${meshReaderSecret.metadata.name}`,
+        { dependsOn: meshReaderSecret },
+      );
+
+      return readSecret.data.apply((data) =>
+        data?.['token']
+          ? Buffer.from(data?.['token'], 'base64').toString('utf-8')
+          : 'undefined',
+      );
+    });
 
   const istioRemoteSecretData = pulumi.interpolate`
 apiVersion: v1
@@ -203,7 +215,10 @@ users:
   return istioRemoteSecretData;
 }
 
-function exposeApiServer(clusterFqdn: string) {
+function exposeApiServer(
+  crds: pulumi.Input<pulumi.Resource>,
+  clusterFqdn: string,
+) {
   const kubeApiServerHost = 'kubernetes.default.svc.cluster.local';
 
   const kubeApiLabels = {
@@ -211,82 +226,94 @@ function exposeApiServer(clusterFqdn: string) {
     provider: 'kubernetes',
   };
 
-  const gateway = new k8s.apiextensions.CustomResource('kubernetes-gateway', {
-    apiVersion: 'networking.istio.io/v1alpha3',
-    kind: 'Gateway',
-    metadata: {
-      namespace: 'istio-system',
-      labels: kubeApiLabels,
-    },
-    spec: {
-      selector: { istio: 'ingressgateway' },
-      servers: [
-        {
-          port: { number: 80, name: 'http', protocol: 'HTTP' },
-          hosts: [clusterFqdn],
-          tls: { httpsRedirect: true },
-        },
-        {
-          port: {
-            number: 443,
-            name: 'https',
-            protocol: 'HTTPS',
+  const gateway = new k8s.apiextensions.CustomResource(
+    'kubernetes-gateway',
+    {
+      apiVersion: 'networking.istio.io/v1alpha3',
+      kind: 'Gateway',
+      metadata: {
+        namespace: 'istio-system',
+        labels: kubeApiLabels,
+      },
+      spec: {
+        selector: { istio: 'ingressgateway' },
+        servers: [
+          {
+            port: { number: 80, name: 'http', protocol: 'HTTP' },
+            hosts: [clusterFqdn],
+            tls: { httpsRedirect: true },
           },
+          {
+            port: {
+              number: 443,
+              name: 'https',
+              protocol: 'HTTPS',
+            },
+            tls: {
+              mode: 'SIMPLE',
+              credentialName: 'wildcard-tls',
+            },
+            hosts: [clusterFqdn],
+          },
+        ],
+      },
+    },
+    { dependsOn: [crds] },
+  );
+
+  new k8s.apiextensions.CustomResource(
+    'kubernetes-virtual-service',
+    {
+      apiVersion: 'networking.istio.io/v1alpha3',
+      kind: 'VirtualService',
+      metadata: {
+        namespace: 'istio-system',
+        labels: kubeApiLabels,
+      },
+      spec: {
+        hosts: [clusterFqdn],
+        gateways: [gateway.metadata.name],
+        http: [
+          {
+            route: [
+              {
+                destination: {
+                  host: kubeApiServerHost,
+                  port: { number: 443 },
+                },
+              },
+            ],
+          },
+        ],
+      },
+    },
+    { dependsOn: [crds] },
+  );
+
+  new k8s.apiextensions.CustomResource(
+    'kubernetes-destination-rule',
+    {
+      apiVersion: 'networking.istio.io/v1alpha3',
+      kind: 'DestinationRule',
+      metadata: {
+        name: 'kubernetes',
+        namespace: 'istio-system',
+        labels: kubeApiLabels,
+      },
+      spec: {
+        host: kubeApiServerHost,
+        trafficPolicy: {
           tls: {
             mode: 'SIMPLE',
-            credentialName: 'wildcard-tls',
+            caCertificates:
+              '/var/run/secrets/kubernetes.io/serviceaccount/ca.crt',
+            sni: kubeApiServerHost,
           },
-          hosts: [clusterFqdn],
-        },
-      ],
-    },
-  });
-
-  new k8s.apiextensions.CustomResource('kubernetes-virtual-service', {
-    apiVersion: 'networking.istio.io/v1alpha3',
-    kind: 'VirtualService',
-    metadata: {
-      namespace: 'istio-system',
-      labels: kubeApiLabels,
-    },
-    spec: {
-      hosts: [clusterFqdn],
-      gateways: [gateway.metadata.name],
-      http: [
-        {
-          route: [
-            {
-              destination: {
-                host: kubeApiServerHost,
-                port: { number: 443 },
-              },
-            },
-          ],
-        },
-      ],
-    },
-  });
-
-  new k8s.apiextensions.CustomResource('kubernetes-destination-rule', {
-    apiVersion: 'networking.istio.io/v1alpha3',
-    kind: 'DestinationRule',
-    metadata: {
-      name: 'kubernetes',
-      namespace: 'istio-system',
-      labels: kubeApiLabels,
-    },
-    spec: {
-      host: kubeApiServerHost,
-      trafficPolicy: {
-        tls: {
-          mode: 'SIMPLE',
-          caCertificates:
-            '/var/run/secrets/kubernetes.io/serviceaccount/ca.crt',
-          sni: kubeApiServerHost,
         },
       },
     },
-  });
+    { dependsOn: [crds] },
+  );
 
   new k8s.rbac.v1.ClusterRoleBinding(
     'anonymous-service-account-issuer-discovery',
@@ -307,48 +334,56 @@ function exposeApiServer(clusterFqdn: string) {
     },
   );
 
-  new k8s.apiextensions.CustomResource('kubernetes-request-authn', {
-    apiVersion: 'security.istio.io/v1beta1',
-    kind: 'RequestAuthentication',
-    metadata: {
-      namespace: 'istio-system',
-    },
-    spec: {
-      selector: {
-        matchLabels: {
-          istio: 'ingressgateway',
-        },
+  new k8s.apiextensions.CustomResource(
+    'kubernetes-request-authn',
+    {
+      apiVersion: 'security.istio.io/v1beta1',
+      kind: 'RequestAuthentication',
+      metadata: {
+        namespace: 'istio-system',
       },
-      jwtRules: [
-        {
-          issuer: 'kubernetes/serviceaccount',
-          jwksUri: `https://${kubeApiServerHost}/openid/v1/jwks`,
-          forwardOriginalToken: true,
+      spec: {
+        selector: {
+          matchLabels: {
+            istio: 'ingressgateway',
+          },
         },
-      ],
+        jwtRules: [
+          {
+            issuer: 'kubernetes/serviceaccount',
+            jwksUri: `https://${kubeApiServerHost}/openid/v1/jwks`,
+            forwardOriginalToken: true,
+          },
+        ],
+      },
     },
-  });
+    { dependsOn: [crds] },
+  );
 
-  new k8s.apiextensions.CustomResource('kubernetes-authz-policy', {
-    apiVersion: 'security.istio.io/v1beta1',
-    kind: 'AuthorizationPolicy',
-    metadata: {
-      namespace: 'istio-system',
-    },
-    spec: {
-      selector: {
-        matchLabels: {
-          istio: 'ingressgateway',
-        },
+  new k8s.apiextensions.CustomResource(
+    'kubernetes-authz-policy',
+    {
+      apiVersion: 'security.istio.io/v1beta1',
+      kind: 'AuthorizationPolicy',
+      metadata: {
+        namespace: 'istio-system',
       },
-      action: 'ALLOW',
-      rules: [
-        { to: [{ operation: { notHosts: [clusterFqdn] } }] },
-        {
-          from: [{ source: { requestPrincipals: ['*'] } }],
-          to: [{ operation: { hosts: [clusterFqdn] } }],
+      spec: {
+        selector: {
+          matchLabels: {
+            istio: 'ingressgateway',
+          },
         },
-      ],
+        action: 'ALLOW',
+        rules: [
+          { to: [{ operation: { notHosts: [clusterFqdn] } }] },
+          {
+            from: [{ source: { requestPrincipals: ['*'] } }],
+            to: [{ operation: { hosts: [clusterFqdn] } }],
+          },
+        ],
+      },
     },
-  });
+    { dependsOn: [crds] },
+  );
 }

@@ -5,10 +5,20 @@ import { RandomId } from '@pulumi/random';
 export const workDir = __dirname;
 export const projectName = 'infra-do-cluster';
 
+function stackConfig() {
+  const config = new pulumi.Config();
+
+  return {
+    region: config.require('region'),
+  };
+}
+
 export async function stack() {
   if (!pulumi.runtime.hasEngine()) {
     return;
   }
+
+  const { region } = stackConfig();
 
   const defaultPoolSuffix = new RandomId('default-pool-suffix', {
     byteLength: 8,
@@ -19,10 +29,10 @@ export async function stack() {
     {
       nodePool: {
         name: pulumi.interpolate`default-${defaultPoolSuffix}`,
-        size: 's-2vcpu-2gb',
+        size: 's-2vcpu-4gb',
         nodeCount: 1,
       },
-      region: 'tor1',
+      region,
       autoUpgrade: true,
       version: '1.21.5-do.0',
       surgeUpgrade: true,
@@ -30,5 +40,7 @@ export async function stack() {
     { ignoreChanges: ['version', 'nodePool', 'name'] },
   );
 
-  return { clusterName: cluster.name, region: cluster.region };
+  const kubeconfig = pulumi.secret(cluster.kubeConfigs[0].rawConfig);
+
+  return { clusterName: cluster.name, region: cluster.region, kubeconfig };
 }

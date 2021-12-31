@@ -1,6 +1,9 @@
-import { runtime, Config, getStack, interpolate } from '@pulumi/pulumi';
+import { Config, runtime, getStack, interpolate, secret } from '@pulumi/pulumi';
 import { RandomId } from '@pulumi/random';
-import { ManagedCluster } from '@pulumi/azure-native/containerservice';
+import {
+  ManagedCluster,
+  listManagedClusterAdminCredentials,
+} from '@pulumi/azure-native/containerservice';
 import { UserAssignedIdentity } from '@pulumi/azure-native/managedidentity';
 import { Subnet, VirtualNetwork } from '@pulumi/azure-native/network';
 import { ResourceGroup } from '@pulumi/azure-native/resources';
@@ -10,16 +13,25 @@ import * as publicIp from 'public-ip';
 export const workDir = __dirname;
 export const projectName = 'infra-azure-cluster';
 
+function stackConfig() {
+  const config = new Config();
+
+  return {
+    location: config.require('location'),
+  };
+}
+
 export async function stack() {
   if (!runtime.hasEngine()) {
     return;
   }
 
+  const { location } = stackConfig();
   const azureConfig = new Config('azure-native');
   const subscriptionId = azureConfig.require('subscriptionId');
 
   const group = new ResourceGroup('resource-group', {
-    location: 'northcentralus',
+    location,
     resourceGroupName: `pulumi-${getStack()}`,
   });
 
@@ -117,10 +129,33 @@ export async function stack() {
     );
   });
 
+  const clusterName = cluster.name;
+  const resourceGroupName = group.name;
+
+  const kubeconfig = secret({ clusterName, resourceGroupName }).apply(
+    async ({ clusterName, resourceGroupName }) => {
+      const creds = await listManagedClusterAdminCredentials({
+        resourceName: clusterName,
+        resourceGroupName,
+      });
+
+      const base64kubeconfig = creds?.kubeconfigs?.[0]?.value;
+
+      if (base64kubeconfig) {
+        return Buffer.from(base64kubeconfig, 'base64').toString('utf-8');
+      } else {
+        throw new Error(
+          `Unable to retrieve kubeconfig for cluster ${clusterName}`,
+        );
+      }
+    },
+  );
+
   return {
     resourceGroupName: group.name,
     aksIdentityId: aksIdentity.id,
     subscriptionId,
     clusterName: cluster.name,
+    kubeconfig: kubeconfig,
   };
 }

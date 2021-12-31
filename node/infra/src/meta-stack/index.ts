@@ -8,23 +8,43 @@ import { mergeKubeConfigStrings } from '../lib/kubectl';
 import { MeshConfig } from '../lib/meshConfig';
 import * as gcpProjectStack from '../stacks/gcp-project/stack';
 import * as gkeClusterStack from '../stacks/gke-cluster/stack';
+import * as linodeClusterStack from '../stacks/linode-cluster/stack';
+import * as doClusterStack from '../stacks/do-cluster/stack';
+import * as aksClusterStack from '../stacks/azure-cluster/stack';
 import * as k8sTrifectaStack from '../stacks/k8s-trifecta/stack';
 import * as k8sTailscaleStack from '../stacks/k8s-tailscale/stack';
 import * as k8sIstioMeshStack from '../stacks/k8s-istio-mesh/stack';
 
 interface ClusterConfigBase {
   name: string;
+  provider: CloudKubernetesProvider;
   tailscalePort: number;
   result?: ClusterResult;
 }
 
 interface GkeCluster extends ClusterConfigBase {
-  provider: CloudKubernetesProvider;
+  provider: 'gke';
   region: string;
   zone?: 'a' | 'b' | 'c';
 }
 
-type ClusterConfig = GkeCluster;
+interface LkeCluster extends ClusterConfigBase {
+  provider: 'lke';
+  region: string;
+}
+
+interface DigitalOceanCluster extends ClusterConfigBase {
+  provider: 'digitalocean';
+  region: string;
+}
+
+interface AksCluster extends ClusterConfigBase {
+  provider: 'aks';
+  location: string;
+}
+
+type ClusterConfig = GkeCluster | AksCluster | LkeCluster | DigitalOceanCluster;
+
 export async function stack() {
   if (!pulumi.runtime.hasEngine()) {
     return;
@@ -46,30 +66,41 @@ export async function stack() {
       tailscalePort: 63000,
     },
     {
-      name: 'evolving-hen',
-      provider: 'gke',
-      region: 'us-central1',
-      zone: 'b',
-      tailscalePort: 63001,
+      name: 'striking-sailfish',
+      provider: 'lke',
+      region: 'us-central',
+      tailscalePort: 63002,
+    },
+    {
+      name: 'fit-loon',
+      provider: 'digitalocean',
+      region: 'sfo3',
+      tailscalePort: 63004,
+    },
+    {
+      name: 'frank-grub',
+      provider: 'aks',
+      location: 'northcentralus',
+      tailscalePort: 63005,
     },
   ];
 
-  output(
-    clusters.map(async (cluster) => {
-      switch (cluster.provider) {
-        case 'gke':
-          return await gkeCluster(rootConfig, cluster);
-        case 'aks':
-          throw new Error('Not yet implemented');
-        case 'digitalocean':
-          throw new Error('Not yet implemented');
-        case 'lke':
-          throw new Error('Not yet implemented');
-        default:
-          assertUnreachable(cluster.provider, 'Unreachable');
-      }
-    }),
-  );
+  clusters.forEach((cluster) => {
+    switch (cluster.provider) {
+      case 'gke':
+        return gkeCluster(rootConfig, cluster);
+      // case 'aks':
+      //   throw new Error('Not yet implemented');
+      case 'digitalocean':
+        return digitalOceanCluster(rootConfig, cluster);
+      case 'lke':
+        return lkeCluster(rootConfig, cluster);
+      case 'aks':
+        return aksCluster(rootConfig, cluster);
+      default:
+        assertUnreachable(cluster, 'Unreachable');
+    }
+  });
 
   const deployedClusters = clusters.filter(
     (x): x is ClusterConfig & { result: ClusterResult } =>
@@ -205,6 +236,147 @@ function gkeCluster(
     contextName,
     clusterName: clusterName,
     kubeconfig: gkeCluster.stackOutputs.kubeconfig,
+    istioRemoteSecretData: k8sTrifecta.stackOutputs.istioRemoteSecretData.value,
+    tailscalePort: cluster.tailscalePort,
+    clusterConfig: output(localConfig),
+  };
+}
+
+function lkeCluster(
+  rootConfig: pulumi.automation.ConfigMap,
+  cluster: LkeCluster,
+) {
+  const { name: clusterName, region } = cluster;
+  const contextName = `linode-${region}-${clusterName}`;
+
+  let localConfig: pulumi.Input<InputConfigMap> = {
+    ...rootConfig,
+    [`${linodeClusterStack.projectName}:region`]: { value: region },
+    'cloud:kubernetesProvider': { value: 'lke' as CloudKubernetesProvider },
+    'cloud:clusterName': { value: clusterName },
+    'cloud:contextName': { value: contextName },
+  };
+
+  const lkeCluster = new LocalPulumiProgram(
+    `${clusterName}-lke-cluster`,
+    linodeClusterStack,
+    {
+      stackName: clusterName,
+      config: localConfig,
+    },
+  );
+
+  localConfig = mergeConfig(localConfig, {
+    'kubernetes:kubeconfig': lkeCluster.stackOutputs.kubeconfig,
+  });
+
+  const k8sTrifecta = new LocalPulumiProgram(
+    `${clusterName}-k8s-trifecta`,
+    k8sTrifectaStack,
+    {
+      stackName: clusterName,
+      config: localConfig,
+    },
+  );
+
+  cluster.result = {
+    contextName,
+    clusterName: clusterName,
+    kubeconfig: lkeCluster.stackOutputs.kubeconfig,
+    istioRemoteSecretData: k8sTrifecta.stackOutputs.istioRemoteSecretData.value,
+    tailscalePort: cluster.tailscalePort,
+    clusterConfig: output(localConfig),
+  };
+}
+
+function digitalOceanCluster(
+  rootConfig: pulumi.automation.ConfigMap,
+  cluster: DigitalOceanCluster,
+) {
+  const { name: clusterName, region } = cluster;
+  const contextName = `digitalocean-${region}-${clusterName}`;
+
+  let localConfig: pulumi.Input<InputConfigMap> = {
+    ...rootConfig,
+    [`${doClusterStack.projectName}:region`]: { value: region },
+    'cloud:kubernetesProvider': {
+      value: 'digitalocean' as CloudKubernetesProvider,
+    },
+    'cloud:clusterName': { value: clusterName },
+    'cloud:contextName': { value: contextName },
+  };
+
+  const doCluster = new LocalPulumiProgram(
+    `${clusterName}-do-cluster`,
+    doClusterStack,
+    {
+      stackName: clusterName,
+      config: localConfig,
+    },
+  );
+
+  localConfig = mergeConfig(localConfig, {
+    'kubernetes:kubeconfig': doCluster.stackOutputs.kubeconfig,
+  });
+
+  const k8sTrifecta = new LocalPulumiProgram(
+    `${clusterName}-k8s-trifecta`,
+    k8sTrifectaStack,
+    {
+      stackName: clusterName,
+      config: localConfig,
+    },
+  );
+
+  cluster.result = {
+    contextName,
+    clusterName: clusterName,
+    kubeconfig: doCluster.stackOutputs.kubeconfig,
+    istioRemoteSecretData: k8sTrifecta.stackOutputs.istioRemoteSecretData.value,
+    tailscalePort: cluster.tailscalePort,
+    clusterConfig: output(localConfig),
+  };
+}
+
+function aksCluster(
+  rootConfig: pulumi.automation.ConfigMap,
+  cluster: AksCluster,
+) {
+  const { name: clusterName, location } = cluster;
+  const contextName = `aks-${location}-${clusterName}`;
+
+  let localConfig: pulumi.Input<InputConfigMap> = {
+    ...rootConfig,
+    [`${aksClusterStack.projectName}:location`]: { value: location },
+    'cloud:kubernetesProvider': {
+      value: 'aks' as CloudKubernetesProvider,
+    },
+    'cloud:clusterName': { value: clusterName },
+    'cloud:contextName': { value: contextName },
+  };
+
+  const aksCluster = new LocalPulumiProgram(`${clusterName}-aks-cluster`, aksClusterStack, {
+    stackName: clusterName,
+    config: localConfig,
+  });
+
+  localConfig = mergeConfig(localConfig, {
+    'kubernetes:kubeconfig': aksCluster.stackOutputs.kubeconfig,
+  });
+
+  const k8sTrifecta = new LocalPulumiProgram(
+    `${clusterName}-k8s-trifecta`,
+    k8sTrifectaStack,
+    {
+      stackName: clusterName,
+      config: localConfig,
+    },
+  );
+
+  cluster.result = {
+    contextName,
+    clusterName: clusterName,
+    kubeconfig: aksCluster.stackOutputs.kubeconfig,
     istioRemoteSecretData: k8sTrifecta.stackOutputs.istioRemoteSecretData.value,
     tailscalePort: cluster.tailscalePort,
     clusterConfig: output(localConfig),
