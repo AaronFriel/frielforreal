@@ -1,10 +1,22 @@
 # dependencies
 /node_modules
 /.pnp
-.pnp.js
+.pnp.cjs
+.pnp.loader.mjs
+/.parcel-cache
+
+# yarn
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
 
 # compilation result
 /dist
+/bin
 
 # CA outputs
 .certs

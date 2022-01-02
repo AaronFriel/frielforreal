@@ -1,4 +1,6 @@
+import * as k8s from '@pulumi/kubernetes';
 import { Resource } from '@pulumi/pulumi';
+import lazyValue from 'lazy-value';
 
 import { getConfig } from './config';
 import { gkeFirewallRule } from './gcp-util/gkeFirewallRule';
@@ -31,7 +33,7 @@ export function kubernetesWebhookFirewallRule(
         gkeMasterIpv4CidrBlock: gkeClusterConfig.masterIpv4CidrBlock,
         gkeNetwork: cloudConfig.gkeNetwork,
         gkeNodeTag: cloudConfig.gkeNodeTag,
-        protocol: protocol,
+        protocol,
         ports: ports.map((x) => `${x}`),
       }),
     );
@@ -39,3 +41,11 @@ export function kubernetesWebhookFirewallRule(
 
   return firewallRules;
 }
+
+export const getClusterCaCertificate = lazyValue(
+  () =>
+    k8s.core.v1.ConfigMap.get(
+      'istio-kube-ca-cert',
+      'kube-public/kube-root-ca.crt',
+    ).data['ca.crt'],
+);

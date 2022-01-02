@@ -46,19 +46,21 @@ export async function stackUp<T extends StackModule<unknown>>({
   dryrun?: boolean;
   additionalConfig: ConfigMap;
 }): Promise<StackUpResult<T>> {
-  const formatter = outputFormatter(`${stackModule.projectName}/${stackName}`);
+  const { projectName, workDir } = stackModule;
+
+  const formatter = outputFormatter(`${projectName}/${stackName}`);
 
   const localProgramArgs: LocalProgramArgs = {
     stackName,
-    workDir: stackModule.workDir,
+    workDir,
   };
   const stack = await LocalWorkspace.createOrSelectStack(localProgramArgs, {
     projectSettings: {
-      name: stackModule.projectName,
+      name: projectName,
       runtime: 'nodejs',
     },
   });
-  formatter(`Spinning up stack ${stackModule.projectName}/${stackName}`);
+  formatter(`Spinning up stack ${projectName}/${stackName}`);
   const sharedConfig = await sharedProject.getAllConfig();
   await stack.setAllConfig({
     ...sharedConfig,
@@ -69,11 +71,11 @@ export async function stackUp<T extends StackModule<unknown>>({
   await stack.refresh();
 
   if (dryrun) {
-    const outputs = await stack.outputs();
+    const outputs = (await stack.outputs()) as StackOutputMap<T>;
     return {
       stack,
-      projectName: stackModule.projectName,
-      outputs: outputs as StackOutputMap<T>,
+      projectName,
+      outputs,
     };
   }
   formatter('Deploying');

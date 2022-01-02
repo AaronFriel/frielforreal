@@ -3,7 +3,9 @@ import * as pulumi from '@pulumi/pulumi';
 export type MeshConfig = {
   clusterName: string;
   tailscalePort: number;
-  istioRemoteSecretData?: string;
+  istioRemoteSecretData: string | undefined;
+  linkerdRemoteSecretData: string | undefined;
+  linkerdGatewayFqdn: string | undefined;
 };
 
 export function meshConfig() {

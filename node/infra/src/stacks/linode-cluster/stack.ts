@@ -27,20 +27,24 @@ export async function stack() {
     prefix: 'lke',
   }).id;
 
-  const cluster = new linode.LkeCluster('cluster', {
-    k8sVersion: '1.22',
-    label,
-    region,
-    controlPlane: {
-      highAvailability: false,
-    },
-    pools: [
-      {
-        type: 'g6-dedicated-2',
-        count: 1,
+  const cluster = new linode.LkeCluster(
+    'cluster',
+    {
+      k8sVersion: '1.21',
+      label,
+      region,
+      controlPlane: {
+        highAvailability: false,
       },
-    ],
-  });
+      pools: [
+        {
+          type: 'g6-standard-4',
+          count: 1,
+        },
+      ],
+    },
+    { ignoreChanges: ['k8sVersion', 'pools'] },
+  );
 
   return {
     kubeconfig: secret(cluster.kubeconfig).apply((base64data) =>

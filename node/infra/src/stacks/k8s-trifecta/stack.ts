@@ -1,42 +1,57 @@
 import * as pulumi from '@pulumi/pulumi';
+import lazyValue from 'lazy-value';
 
-import { createCertManager } from './lib/cert-manager';
-import { createExternalDns } from './lib/external-dns';
-import { createIngressNginx } from './lib/ingress-nginx';
-import { createIstio } from './lib/istio';
+import { certManager } from './lib/cert-manager';
+import { externalDns } from './lib/external-dns';
+import { ingressNginx } from './lib/ingress-nginx';
+import { istio } from './lib/istio';
+import { getLinkerdGatewayApiFqdn, linkerd } from './lib/linkerd';
+import { linkerdClusterCredentials } from './lib/linkerdKubeApiProxy';
 
 export const workDir = __dirname;
 export const projectName = 'infra-k8s-trifecta';
 
-export function stackConfig() {
+export const stackConfig = lazyValue(() => {
   const config = new pulumi.Config(projectName);
 
   return {
     cloudflareApiToken: config.requireSecret('cloudflareApiToken'),
     parentDomain: config.require('parentDomain'),
-    istioCaCert: config.requireSecret('istioCaCert'),
-    istioCaKey: config.requireSecret('istioCaKey'),
-    istioRootCert: config.requireSecret('istioRootCert'),
-    istioCertChain: config.requireSecret('istioCertChain'),
+    deployIstio: config.getBoolean('deployIstio') ?? false,
+    deployLinkerd: config.getBoolean('deployLinkerd') ?? true,
   };
-}
+});
 
 export async function stack() {
   if (!pulumi.runtime.hasEngine()) {
     return;
   }
 
-  const { certManagerCrds } = createCertManager();
+  const { deployIstio, deployLinkerd } = stackConfig();
 
-  createExternalDns();
+  certManager();
 
-  createIngressNginx({ certManagerCrds });
+  externalDns();
 
-  const { istioRemoteSecretData } = createIstio({
-    certManagerCrds,
-  });
+  ingressNginx();
+
+  linkerd();
+
+  let istioRemoteSecretData: pulumi.Output<string> = pulumi.secret('');
+  if (deployIstio) {
+    ({ istioRemoteSecretData } = istio());
+  }
+
+  let linkerdRemoteSecretData: pulumi.Output<string> = pulumi.secret('');
+  let linkerdGatewayFqdn: string | undefined;
+  if (deployLinkerd) {
+    linkerdGatewayFqdn = getLinkerdGatewayApiFqdn();
+    linkerdRemoteSecretData = linkerdClusterCredentials();
+  }
 
   return {
     istioRemoteSecretData,
+    linkerdRemoteSecretData,
+    linkerdGatewayFqdn,
   };
 }

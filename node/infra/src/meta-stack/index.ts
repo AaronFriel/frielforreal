@@ -13,7 +13,7 @@ import * as doClusterStack from '../stacks/do-cluster/stack';
 import * as aksClusterStack from '../stacks/azure-cluster/stack';
 import * as k8sTrifectaStack from '../stacks/k8s-trifecta/stack';
 import * as k8sTailscaleStack from '../stacks/k8s-tailscale/stack';
-import * as k8sIstioMeshStack from '../stacks/k8s-istio-mesh/stack';
+import * as k8sLinkerdMeshStack from '../stacks/k8s-linkerd-mesh/stack';
 
 interface ClusterConfigBase {
   name: string;
@@ -112,6 +112,8 @@ export async function stack() {
       clusterName: c.result.clusterName,
       istioRemoteSecretData: c.result.istioRemoteSecretData,
       tailscalePort: c.result.tailscalePort,
+      linkerdGatewayFqdn: c.result.linkerdGatewayFqdn,
+      linkerdRemoteSecretData: c.result.linkerdRemoteSecretData,
     }));
 
     return {
@@ -131,7 +133,7 @@ export async function stack() {
       config: localConfig,
     });
 
-    new LocalPulumiProgram(`${clusterName}-istio-mesh`, k8sIstioMeshStack, {
+    new LocalPulumiProgram(`${clusterName}-linkerd-mesh`, k8sLinkerdMeshStack, {
       stackName: clusterName,
       config: localConfig,
     });
@@ -168,6 +170,8 @@ interface ClusterResult {
   contextName: string;
   kubeconfig: pulumi.Output<pulumi.automation.ConfigValue>;
   istioRemoteSecretData: pulumi.Output<string>;
+  linkerdRemoteSecretData: pulumi.Output<string | undefined>;
+  linkerdGatewayFqdn: pulumi.Output<string | undefined>;
   tailscalePort: number;
   clusterConfig: pulumi.Output<InputConfigMap>;
 }
@@ -234,9 +238,12 @@ function gkeCluster(
 
   cluster.result = {
     contextName,
-    clusterName: clusterName,
+    clusterName,
     kubeconfig: gkeCluster.stackOutputs.kubeconfig,
     istioRemoteSecretData: k8sTrifecta.stackOutputs.istioRemoteSecretData.value,
+    linkerdRemoteSecretData:
+      k8sTrifecta.stackOutputs.linkerdRemoteSecretData.value,
+    linkerdGatewayFqdn: k8sTrifecta.stackOutputs.linkerdGatewayFqdn.value,
     tailscalePort: cluster.tailscalePort,
     clusterConfig: output(localConfig),
   };
@@ -281,9 +288,12 @@ function lkeCluster(
 
   cluster.result = {
     contextName,
-    clusterName: clusterName,
+    clusterName,
     kubeconfig: lkeCluster.stackOutputs.kubeconfig,
     istioRemoteSecretData: k8sTrifecta.stackOutputs.istioRemoteSecretData.value,
+    linkerdRemoteSecretData:
+      k8sTrifecta.stackOutputs.linkerdRemoteSecretData.value,
+    linkerdGatewayFqdn: k8sTrifecta.stackOutputs.linkerdGatewayFqdn.value,
     tailscalePort: cluster.tailscalePort,
     clusterConfig: output(localConfig),
   };
@@ -330,9 +340,12 @@ function digitalOceanCluster(
 
   cluster.result = {
     contextName,
-    clusterName: clusterName,
+    clusterName,
     kubeconfig: doCluster.stackOutputs.kubeconfig,
     istioRemoteSecretData: k8sTrifecta.stackOutputs.istioRemoteSecretData.value,
+    linkerdRemoteSecretData:
+      k8sTrifecta.stackOutputs.linkerdRemoteSecretData.value,
+    linkerdGatewayFqdn: k8sTrifecta.stackOutputs.linkerdGatewayFqdn.value,
     tailscalePort: cluster.tailscalePort,
     clusterConfig: output(localConfig),
   };
@@ -355,10 +368,14 @@ function aksCluster(
     'cloud:contextName': { value: contextName },
   };
 
-  const aksCluster = new LocalPulumiProgram(`${clusterName}-aks-cluster`, aksClusterStack, {
-    stackName: clusterName,
-    config: localConfig,
-  });
+  const aksCluster = new LocalPulumiProgram(
+    `${clusterName}-aks-cluster`,
+    aksClusterStack,
+    {
+      stackName: clusterName,
+      config: localConfig,
+    },
+  );
 
   localConfig = mergeConfig(localConfig, {
     'kubernetes:kubeconfig': aksCluster.stackOutputs.kubeconfig,
@@ -375,9 +392,12 @@ function aksCluster(
 
   cluster.result = {
     contextName,
-    clusterName: clusterName,
+    clusterName,
     kubeconfig: aksCluster.stackOutputs.kubeconfig,
     istioRemoteSecretData: k8sTrifecta.stackOutputs.istioRemoteSecretData.value,
+    linkerdRemoteSecretData:
+      k8sTrifecta.stackOutputs.linkerdRemoteSecretData.value,
+    linkerdGatewayFqdn: k8sTrifecta.stackOutputs.linkerdGatewayFqdn.value,
     tailscalePort: cluster.tailscalePort,
     clusterConfig: output(localConfig),
   };

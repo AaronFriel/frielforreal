@@ -15,18 +15,20 @@ interface IstioOperatorManifestOptions {
    */
   cloudProvider: CloudKubernetesProvider | undefined;
   /**
-   * Kubernetes Cluster CA certificate.
+   * Additional certificate authority certificate in PEM format to validate JWT tokens against.
+   *
+   * Used to allow validating service account tokens issued by the Kubernetes cluster.
    */
-  clusterCaCrt: pulumi.Input<string>;
+  jwksResolverExtraRootCA?: pulumi.Input<string>;
 }
 
 /**
  * Uses `istioctl manifest generate` to create a string containing YAML resources to deploy.
  */
-export function getIstioOperatorManifest({
+export function renderIstioOperatorManifest({
   clusterName,
   cloudProvider,
-  clusterCaCrt,
+  jwksResolverExtraRootCA,
 }: IstioOperatorManifestOptions): pulumi.Output<string> {
   const $ = YZX();
   $.verbose = false;
@@ -44,15 +46,27 @@ export function getIstioOperatorManifest({
         },
       },
       profile: 'demo',
+      meshConfig: {
+        defaultConfig: {
+          proxyMetadata: {
+            ISTIO_META_DNS_CAPTURE: 'true',
+            ISTIO_META_DNS_AUTO_ALLOCATE: 'true',
+          },
+        },
+      },
       values: {
         pilot: {
           // Required to securely expose the Kubernetes API over an Istio ingress gateway.
-          jwksResolverExtraRootCA: clusterCaCrt,
+          jwksResolverExtraRootCA,
+          env: {
+            PILOT_USE_ENDPOINT_SLICE: 'true',
+            ENABLE_MULTICLUSTER_HEADLESS: 'true',
+          },
         },
         global: {
           meshID: 'mesh1',
           multiCluster: {
-            clusterName: clusterName,
+            clusterName,
           },
           network: clusterName,
         },

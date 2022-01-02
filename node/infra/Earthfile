@@ -29,7 +29,7 @@ build:
 deps-prod:
   FROM ../node16+base
   WORKDIR /app
-  COPY package.json package-lock.json ./
+  COPY package-lock.json ./
   ENV npm_config_cache=/var/cache/npm
   RUN --mount=type=cache,target=/var/cache/npm npm ci --ignore-scripts --prod
   COPY . .
@@ -38,14 +38,35 @@ deps-pulumi:
   FROM docker.io/library/alpine:3.14.3@sha256:635f0aa53d99017b38d1a0aa5b2082f7812b03e3cdb299103fe77b5c8a07f1d2
   RUN wget https://github.com/pulumi/pulumi/releases/download/v3.20.0/pulumi-v3.20.0-linux-x64.tar.gz && \
       tar -xzvf ./pulumi-v3.20.0-linux-x64.tar.gz
+  # Directory of bins
   SAVE ARTIFACT ./pulumi
 
-# TODO: az, gcloud, doctl CLIs
+deps-istioctl:
+  FROM docker.io/library/alpine:3.14.3@sha256:635f0aa53d99017b38d1a0aa5b2082f7812b03e3cdb299103fe77b5c8a07f1d2
+  RUN wget https://github.com/istio/istio/releases/download/1.12.1/istioctl-1.12.1-linux-amd64.tar.gz && \
+      tar -xzvf ./istioctl-1.12.1-linux-amd64.tar.gz
+  # Single file
+  SAVE ARTIFACT ./istioctl
+
+deps-step:
+  FROM docker.io/library/alpine:3.14.3@sha256:635f0aa53d99017b38d1a0aa5b2082f7812b03e3cdb299103fe77b5c8a07f1d2
+  RUN wget https://github.com/smallstep/cli/releases/download/v0.18.1-rc5/step_linux_0.18.1-rc5_amd64.tar.gz && \
+      tar -xzvf step_linux_0.18.1-rc5_amd64.tar.gz && \
+  # Single file
+  SAVE ARTIFACT ./step_0.18.1-rc5/bin/step
+
+deps-linkerd:
+  FROM docker.io/library/alpine:3.14.3@sha256:635f0aa53d99017b38d1a0aa5b2082f7812b03e3cdb299103fe77b5c8a07f1d2
+  RUN wget https://github.com/linkerd/linkerd2/releases/download/edge-21.12.4/linkerd2-cli-edge-21.12.4-linux-amd64 -O linkerd && \
+      chmod +x ./linkerd
+  # Single file
+  SAVE ARTIFACT ./linkerd
 
 docker:
   FROM +deps-prod
   COPY +build/dist /app/dist
   COPY +deps-pulumi/pulumi/* /usr/local/bin/*
+  COPY +deps-istioctl/istioctl /usr/local/bin/
   ENTRYPOINT ["/bin/sh"]
   SAVE IMAGE --push afriel/infra:latest
 

@@ -3,6 +3,9 @@
 /.pnp
 .pnp.js
 
+# compilation result
+/dist
+
 # misc
 .DS_Store
 *.pem
@@ -13,4 +16,4 @@ yarn-debug.log*
 yarn-error.log*
 
 # Rendered config files:
-stacks/*/Pulumi.*.yaml
+src/stacks/*/Pulumi.*.yaml

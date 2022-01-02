@@ -67,9 +67,6 @@ async function withTemporaryStack(
     [stackName, projectName] = id.split('/');
   }
 
-  process.stdout.write(stackName);
-  process.stdout.write(projectName);
-
   const os = await import('os');
   const path = await import('path');
   const fs = await import('fs');

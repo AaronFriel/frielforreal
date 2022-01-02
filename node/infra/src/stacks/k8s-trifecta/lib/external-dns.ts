@@ -4,7 +4,7 @@ import { RandomUuid } from '@pulumi/random';
 
 import { stackConfig } from '../stack';
 
-export function createExternalDns() {
+export function externalDns() {
   const k8sTrifectaConfig = stackConfig();
 
   const namespace = new k8s.core.v1.Namespace('admin-external-dns');
@@ -95,7 +95,10 @@ export function createExternalDns() {
               image: 'k8s.gcr.io/external-dns/external-dns:v0.10.2',
               args: [
                 '--source=ingress',
-                '--source=istio-gateway',
+                '--source=service',
+                ...(k8sTrifectaConfig.deployIstio
+                  ? ['--source=istio-gateway']
+                  : []),
                 '--domain-filter=frielforreal.io',
                 '--provider=cloudflare',
                 '--registry=txt',

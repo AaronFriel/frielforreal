@@ -124,7 +124,7 @@ export async function stack() {
       },
       {
         ignoreChanges: ['kubernetesVersion', 'agentPoolProfiles'],
-        protect: true,
+        protect: false,
       },
     );
   });
@@ -156,6 +156,6 @@ export async function stack() {
     aksIdentityId: aksIdentity.id,
     subscriptionId,
     clusterName: cluster.name,
-    kubeconfig: kubeconfig,
+    kubeconfig,
   };
 }

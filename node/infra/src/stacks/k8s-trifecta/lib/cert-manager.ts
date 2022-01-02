@@ -1,13 +1,21 @@
 import * as path from 'path';
 
 import * as k8s from '@pulumi/kubernetes';
+import lazyValue from 'lazy-value';
 
 import { stackConfig } from '../stack';
 import { kubernetesWebhookFirewallRule } from '../../../lib/kubernetes-util';
 
 import { cloudflareDns01Issuer } from './constants';
 
-export function createCertManager() {
+export const certManagerCrds = lazyValue(
+  () =>
+    new k8s.yaml.ConfigFile('cert-manager-crds', {
+      file: path.join(__dirname, 'cert-manager-crds.yaml'),
+    }),
+);
+
+export function certManager() {
   const k8sTrifectaConfig = stackConfig();
 
   const firewallRules = kubernetesWebhookFirewallRule('cert-manager', 'TCP', [
@@ -16,9 +24,7 @@ export function createCertManager() {
 
   const namespace = new k8s.core.v1.Namespace('admin-cert-manager');
 
-  const crds = new k8s.yaml.ConfigFile('cert-manager-crds', {
-    file: path.join(__dirname, 'cert-manager-crds.yaml'),
-  });
+  const crds = certManagerCrds();
 
   const chart = new k8s.helm.v3.Chart(
     'cert-manager',
@@ -82,6 +88,4 @@ export function createCertManager() {
     },
     { dependsOn: [chart, crds, ...firewallRules], ignoreChanges: ['status'] },
   );
-
-  return { certManagerCrds: crds };
 }
