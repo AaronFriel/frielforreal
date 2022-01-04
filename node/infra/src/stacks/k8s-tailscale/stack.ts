@@ -1,10 +1,11 @@
 import { readFile } from 'fs/promises';
 import path from 'path';
 
-import * as pulumi from '@pulumi/pulumi';
 import * as k8s from '@pulumi/kubernetes';
+import * as pulumi from '@pulumi/pulumi';
 
 import { getConfig } from '../../lib/config';
+import { disableLinkerdAdmissionWebhook } from '../k8s-trifecta/lib/linkerd';
 
 export const workDir = __dirname;
 export const projectName = 'infra-k8s-tailscale';
@@ -35,6 +36,9 @@ export async function stack() {
   const namespace = new k8s.core.v1.Namespace('tailscale-system', {
     metadata: {
       name: 'tailscale-system',
+      labels: {
+        ...disableLinkerdAdmissionWebhook,
+      },
     },
   });
 

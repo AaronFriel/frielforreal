@@ -2,6 +2,7 @@ import * as pulumi from '@pulumi/pulumi';
 import lazyValue from 'lazy-value';
 
 import { certManager } from './lib/cert-manager';
+import { descheduler } from './lib/descheduler';
 import { externalDns } from './lib/external-dns';
 import { ingressNginx } from './lib/ingress-nginx';
 import { istio } from './lib/istio';
@@ -28,6 +29,8 @@ export async function stack() {
   }
 
   const { deployIstio, deployLinkerd } = stackConfig();
+
+  descheduler();
 
   certManager();
 

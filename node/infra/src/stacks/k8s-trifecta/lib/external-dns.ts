@@ -4,10 +4,18 @@ import { RandomUuid } from '@pulumi/random';
 
 import { stackConfig } from '../stack';
 
+import { disableLinkerdAdmissionWebhook } from './linkerd';
+
 export function externalDns() {
   const k8sTrifectaConfig = stackConfig();
 
-  const namespace = new k8s.core.v1.Namespace('admin-external-dns');
+  const namespace = new k8s.core.v1.Namespace('admin-external-dns', {
+    metadata: {
+      labels: {
+        ...disableLinkerdAdmissionWebhook,
+      },
+    },
+  });
 
   const serviceAccount = new k8s.core.v1.ServiceAccount('external-dns', {
     metadata: {

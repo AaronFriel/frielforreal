@@ -3,10 +3,11 @@ import * as path from 'path';
 import * as k8s from '@pulumi/kubernetes';
 import lazyValue from 'lazy-value';
 
-import { stackConfig } from '../stack';
 import { kubernetesWebhookFirewallRule } from '../../../lib/kubernetes-util';
+import { stackConfig } from '../stack';
 
 import { cloudflareDns01Issuer } from './constants';
+import { disableLinkerdAdmissionWebhook } from './linkerd';
 
 export const certManagerCrds = lazyValue(
   () =>
@@ -22,7 +23,13 @@ export function certManager() {
     10250,
   ]);
 
-  const namespace = new k8s.core.v1.Namespace('admin-cert-manager');
+  const namespace = new k8s.core.v1.Namespace('admin-cert-manager', {
+    metadata: {
+      labels: {
+        ...disableLinkerdAdmissionWebhook,
+      },
+    },
+  });
 
   const crds = certManagerCrds();
 

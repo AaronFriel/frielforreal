@@ -1,7 +1,7 @@
 import * as timers from 'timers/promises';
 
-import * as pulumi from '@pulumi/pulumi';
 import * as k8s from '@pulumi/kubernetes';
+import * as pulumi from '@pulumi/pulumi';
 import lazyValue from 'lazy-value';
 
 import { getConfig } from '../../../lib/config';
@@ -86,7 +86,10 @@ export function linkerdKubeApiProxy() {
     },
   });
 
-  const labels = { 'app.kubernetes.io/name': 'kube-api-proxy' };
+  const labels = {
+    'app.kubernetes.io/name': 'kube-api-proxy',
+    app: 'kube-api-proxy',
+  };
 
   new k8s.rbac.v1.ClusterRoleBinding('kube-api-proxy-jwks-access', {
     metadata: {},
@@ -103,6 +106,9 @@ export function linkerdKubeApiProxy() {
       },
     ],
   });
+
+  const jwksDir = '/var/run/jwks/';
+  const jwksFile = 'jwks.json';
 
   const configDir = '/opt/bitnami/envoy/conf/';
   const configFile = 'envoy.yaml';
@@ -139,15 +145,10 @@ static_resources:
               providers:
                 default_provider:
                   payload_in_metadata: "payload"
+                  forward: true
                   issuer: kubernetes/serviceaccount
-                  remote_jwks:
-                    http_uri:
-                      uri: https://kubernetes.default.svc.cluster.local/openid/v1/jwks
-                      cluster: kube_api_server
-                      timeout: 1s
-                    cache_duration: { seconds: 300 }
-                    async_fetch: { fast_listener: true }
-                    retry_policy: { num_retries: 5 }
+                  local_jwks:
+                    filename: ${jwksDir}${jwksFile}
               rules:
               - match: {prefix: /}
                 requires: {provider_name: default_provider}
@@ -188,12 +189,14 @@ static_resources:
       typed_config:
         "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
         sni: kubernetes.default.svc.cluster.local
+
 `.trim(),
     },
   });
 
   const configVolumeName = 'config';
 
+  const jwksVolumeName = 'jwksvolume';
   new k8s.apps.v1.Deployment(
     'kube-api-proxy',
     {
@@ -201,6 +204,7 @@ static_resources:
         namespace: namespace.metadata.name,
         annotations: {
           'pulumi.com/skipAwait': 'true',
+          'linkerd.io/inject': 'enabled',
         },
         labels,
       },
@@ -209,6 +213,9 @@ static_resources:
         template: {
           metadata: {
             labels,
+            annotations: {
+              'linkerd.io/inject': 'enabled',
+            },
           },
           spec: {
             terminationGracePeriodSeconds: 1,
@@ -216,18 +223,34 @@ static_resources:
               {
                 name: 'envoy',
                 image: 'bitnami/envoy:latest',
-                volumeMounts: [
-                  {
-                    name: configVolumeName,
-                    mountPath: `${configDir}/${configFile}`,
-                    subPath: `${configFile}`,
-                  },
+                command: ['/bin/sh', '-c'],
+                args: [
+                  `
+                TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token);
+                curl \
+                  --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt \
+                  --header "Authorization: Bearer $TOKEN" \
+                  https://kubernetes.default.svc.cluster.local/openid/v1/jwks \
+                  > ${jwksDir}${jwksFile};
+                  /opt/bitnami/envoy/bin/envoy --log-level info -c ${configDir}${configFile}
+                `,
                 ],
                 ports: [
                   {
                     name: 'http',
                     containerPort: 8000,
                     protocol: 'TCP',
+                  },
+                ],
+                volumeMounts: [
+                  {
+                    name: configVolumeName,
+                    mountPath: `${configDir}${configFile}`,
+                    subPath: `${configFile}`,
+                  },
+                  {
+                    mountPath: jwksDir,
+                    name: jwksVolumeName,
                   },
                 ],
               },
@@ -239,12 +262,20 @@ static_resources:
                   name: configMap.metadata.name,
                 },
               },
+              {
+                name: jwksVolumeName,
+                emptyDir: { medium: 'Memory' },
+              },
             ],
           },
         },
       },
     },
-    { dependsOn: linkerdControlPlane() },
+    {
+      dependsOn: pulumi
+        .output([linkerdControlPlane(), configMap])
+        .apply((x) => x.flat()),
+    },
   );
 
   const service = new k8s.core.v1.Service('kube-api-proxy', {

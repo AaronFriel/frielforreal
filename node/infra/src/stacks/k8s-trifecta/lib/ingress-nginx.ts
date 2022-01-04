@@ -1,5 +1,4 @@
 import * as k8s from '@pulumi/kubernetes';
-import { IngressController } from '@pulumi/kubernetes-ingress-nginx';
 import * as pulumi from '@pulumi/pulumi';
 import lazyValue from 'lazy-value';
 
@@ -9,6 +8,7 @@ import { stackConfig } from '../stack';
 
 import { certManagerCrds } from './cert-manager';
 import { cloudflareDns01Issuer } from './constants';
+import { linkerdControlPlane } from './linkerd';
 
 export const ingressNginxWildcardTlsSecretName = 'wildcard-tls';
 
@@ -25,26 +25,24 @@ export async function ingressNginx() {
 
   const namespace = ingressNginxNamespace();
 
-  pulumi
-    .output({
+  new k8s.helm.v3.Chart(
+    'ingress-nginx',
+    {
       namespace: namespace.metadata.name,
-    })
-    .apply(({ namespace }) => {
-      return new IngressController('ingress-nginx', {
-        helmOptions: {
-          namespace,
-          name: 'ingress-nginx',
-          atomic: true,
-        },
+      chart: 'ingress-nginx',
+      fetchOpts: {
+        repo: 'https://kubernetes.github.io/ingress-nginx',
+      },
+      version: '4.0.13',
+      values: {
         controller: {
           podAnnotations: {
             'linkerd.io/inject': deployLinkerd ? 'enabled' : 'disabled',
           },
           watchIngressWithoutClass: true,
           extraArgs: {
-            'default-ssl-certificate': `${namespace}/${ingressNginxWildcardTlsSecretName}`,
-            // eslint-disable-next-line @typescript-eslint/ban-types
-          } as {},
+            'default-ssl-certificate': pulumi.interpolate`${namespace.metadata.name}/${ingressNginxWildcardTlsSecretName}`,
+          },
           publishService: {
             enabled: true,
           },
@@ -55,15 +53,17 @@ export async function ingressNginx() {
             },
           },
         },
-      });
-    });
+      },
+    },
+    { dependsOn: deployLinkerd ? linkerdControlPlane() : [] },
+  );
 
   nginxWildcardCertificate();
 
   return {};
 }
 
-function nginxWildcardCertificate() {
+const nginxWildcardCertificate = lazyValue(() => {
   const { clusterName } = getConfig().cloud();
 
   const { parentDomain } = stackConfig();
@@ -95,4 +95,4 @@ function nginxWildcardCertificate() {
       ignoreChanges: ['status'],
     },
   );
-}
+});

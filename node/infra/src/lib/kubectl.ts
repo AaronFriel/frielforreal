@@ -1,7 +1,7 @@
 import { YZX, $ } from '@frielforreal/yzx';
-import pLimit from 'p-limit';
 import { KubeConfig } from '@kubernetes/client-node';
 import yaml from 'js-yaml';
+import pLimit from 'p-limit';
 
 /**
  * Commands that interact with kube config should run in closures invoked by this function, to
@@ -51,6 +51,28 @@ export async function mergeKubeConfigStrings(configs: string[]) {
     })
     .forEach((x) => kc.mergeConfig(x));
 
+  const jsonConfig = kc.exportConfig();
+
+  return yaml.dump(JSON.parse(jsonConfig));
+}
+export function rewriteKubeconfig(kubeconfig: string, contextName: string) {
+  const kc = new KubeConfig();
+  kc.loadFromString(kubeconfig);
+  kc.contexts[0] = {
+    ...kc.contexts[0],
+    name: contextName,
+    cluster: contextName,
+    user: contextName,
+  };
+  kc.users[0] = {
+    ...kc.users[0],
+    name: contextName,
+  };
+  kc.clusters[0] = {
+    ...kc.clusters[0],
+    name: contextName,
+  };
+  kc.currentContext = contextName;
   const jsonConfig = kc.exportConfig();
 
   return yaml.dump(JSON.parse(jsonConfig));

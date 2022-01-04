@@ -5,16 +5,17 @@ import * as pulumi from '@pulumi/pulumi';
 import lazyValue from 'lazy-value';
 
 import { getConfig } from '../../../lib/config';
-import { stackConfig } from '../stack';
 import { renderIstioOperatorManifest } from '../../../lib/istio-util';
 import {
   getClusterCaCertificate,
   kubernetesWebhookFirewallRule,
 } from '../../../lib/kubernetes-util';
+import { stackConfig } from '../stack';
 
-import { crdOnly, nonCrdOnly } from './crdUtil';
 import { certManagerCrds } from './cert-manager';
 import { cloudflareDns01Issuer } from './constants';
+import { crdOnly, nonCrdOnly } from './crdUtil';
+import { disableLinkerdAdmissionWebhook } from './linkerd';
 
 const istioWildcardTlsSecretName = 'wildcard-tls';
 
@@ -63,6 +64,7 @@ const istioNamespace = lazyValue(() => {
         name: 'istio-system',
         labels: {
           'topology.istio.io/network': clusterName,
+          ...disableLinkerdAdmissionWebhook,
         },
       },
     },

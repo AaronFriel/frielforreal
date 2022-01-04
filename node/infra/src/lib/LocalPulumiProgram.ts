@@ -1,10 +1,10 @@
-import { Resource } from '@pulumi/pulumi/dynamic';
 import { LocalWorkspace } from '@pulumi/pulumi/automation';
+import { Resource } from '@pulumi/pulumi/dynamic';
 
-import type * as pulumi from '@pulumi/pulumi';
-import type * as dynamic from '@pulumi/pulumi/dynamic';
-import type * as automation from '@pulumi/pulumi/automation';
 import type { StackModule, StackOutputMap } from './stackModule';
+import type * as pulumi from '@pulumi/pulumi';
+import type * as automation from '@pulumi/pulumi/automation';
+import type * as dynamic from '@pulumi/pulumi/dynamic';
 
 export interface LocalPulumiProgramResourceInputs {
   stackName: pulumi.Input<string>;

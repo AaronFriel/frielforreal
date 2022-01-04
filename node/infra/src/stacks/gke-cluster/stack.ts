@@ -1,10 +1,10 @@
+import { Cluster, NodePool } from '@pulumi/gcp/container';
+import { KeyRing, CryptoKey, KeyRingIAMBinding } from '@pulumi/gcp/kms';
+import { Project } from '@pulumi/gcp/organizations';
 import * as pulumi from '@pulumi/pulumi';
 import * as random from '@pulumi/random';
-import { Cluster, NodePool } from '@pulumi/gcp/container';
-import { Project } from '@pulumi/gcp/organizations';
-import { KeyRing, CryptoKey, KeyRingIAMBinding } from '@pulumi/gcp/kms';
-import * as publicIp from 'public-ip';
 import moment = require('moment');
+import * as publicIp from 'public-ip';
 
 import { getConfig } from '../../lib/config';
 import { assertOutputNonNull } from '../../lib/output';

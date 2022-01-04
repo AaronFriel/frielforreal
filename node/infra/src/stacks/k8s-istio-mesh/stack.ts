@@ -1,5 +1,5 @@
-import * as pulumi from '@pulumi/pulumi';
 import * as k8s from '@pulumi/kubernetes';
+import * as pulumi from '@pulumi/pulumi';
 
 import { getConfig } from '../../lib/config';
 import { getEastWestGatewayManifest } from '../../lib/istio-util';

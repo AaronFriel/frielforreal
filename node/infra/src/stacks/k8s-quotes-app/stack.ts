@@ -1,5 +1,5 @@
-import * as pulumi from '@pulumi/pulumi';
 import * as k8s from '@pulumi/kubernetes';
+import * as pulumi from '@pulumi/pulumi';
 import { RandomPassword } from '@pulumi/random';
 
 export const workDir = __dirname;

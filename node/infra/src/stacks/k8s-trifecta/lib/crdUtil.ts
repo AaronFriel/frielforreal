@@ -4,7 +4,7 @@ const isCrd = (o: any) => {
   return o?.kind === 'CustomResourceDefinition';
 };
 
-const omitObject = (o: any) => {
+export const omitObject = (o: any) => {
   o.kind = 'List';
   o.apiVersion = 'v1';
   o.metadata = {};

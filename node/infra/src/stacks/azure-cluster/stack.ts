@@ -1,5 +1,4 @@
-import { Config, runtime, getStack, interpolate, secret } from '@pulumi/pulumi';
-import { RandomId } from '@pulumi/random';
+import { RoleAssignment } from '@pulumi/azure-native/authorization';
 import {
   ManagedCluster,
   listManagedClusterAdminCredentials,
@@ -7,14 +6,18 @@ import {
 import { UserAssignedIdentity } from '@pulumi/azure-native/managedidentity';
 import { Subnet, VirtualNetwork } from '@pulumi/azure-native/network';
 import { ResourceGroup } from '@pulumi/azure-native/resources';
-import { RoleAssignment } from '@pulumi/azure-native/authorization';
+import * as pulumi from '@pulumi/pulumi';
+import { RandomId } from '@pulumi/random';
 import * as publicIp from 'public-ip';
+
+import { getConfig } from '../../lib/config';
+import { rewriteKubeconfig } from '../../lib/kubectl';
 
 export const workDir = __dirname;
 export const projectName = 'infra-azure-cluster';
 
 function stackConfig() {
-  const config = new Config();
+  const config = new pulumi.Config();
 
   return {
     location: config.require('location'),
@@ -22,17 +25,18 @@ function stackConfig() {
 }
 
 export async function stack() {
-  if (!runtime.hasEngine()) {
+  if (!pulumi.runtime.hasEngine()) {
     return;
   }
 
   const { location } = stackConfig();
-  const azureConfig = new Config('azure-native');
+  const azureConfig = new pulumi.Config('azure-native');
   const subscriptionId = azureConfig.require('subscriptionId');
+  const { contextName } = getConfig().cloud();
 
   const group = new ResourceGroup('resource-group', {
     location,
-    resourceGroupName: `pulumi-${getStack()}`,
+    resourceGroupName: `pulumi-${pulumi.getStack()}`,
   });
 
   const vnet = new VirtualNetwork(
@@ -76,7 +80,7 @@ export async function stack() {
           upgradeChannel: 'stable', // must ignoreChanges on 'kubernetesVersion', at least.
         },
         enableRBAC: true,
-        dnsPrefix: interpolate`aks-${getStack()}-${dnsSuffix}`,
+        dnsPrefix: pulumi.interpolate`aks-${pulumi.getStack()}-${dnsSuffix}`,
         resourceGroupName: group.name,
         identityProfile: {},
         agentPoolProfiles: [
@@ -132,8 +136,13 @@ export async function stack() {
   const clusterName = cluster.name;
   const resourceGroupName = group.name;
 
-  const kubeconfig = secret({ clusterName, resourceGroupName }).apply(
-    async ({ clusterName, resourceGroupName }) => {
+  const kubeconfig = pulumi
+    .secret({ clusterName, resourceGroupName })
+    .apply(async ({ clusterName, resourceGroupName }) => {
+      if (pulumi.runtime.isDryRun()) {
+        return 'undefined';
+      }
+
       const creds = await listManagedClusterAdminCredentials({
         resourceName: clusterName,
         resourceGroupName,
@@ -141,15 +150,18 @@ export async function stack() {
 
       const base64kubeconfig = creds?.kubeconfigs?.[0]?.value;
 
-      if (base64kubeconfig) {
-        return Buffer.from(base64kubeconfig, 'base64').toString('utf-8');
-      } else {
+      if (!base64kubeconfig) {
         throw new Error(
           `Unable to retrieve kubeconfig for cluster ${clusterName}`,
         );
       }
-    },
-  );
+
+      const configText = Buffer.from(base64kubeconfig, 'base64').toString(
+        'utf-8',
+      );
+
+      return rewriteKubeconfig(configText, contextName);
+    });
 
   return {
     resourceGroupName: group.name,

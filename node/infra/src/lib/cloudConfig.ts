@@ -20,6 +20,7 @@ export function cloudConfig(): CloudProviderConfig {
   return {
     kubernetesProvider,
     clusterName: cloudConfig.require('clusterName'),
+    contextName: cloudConfig.require('contextName'),
   };
 }
 
@@ -27,8 +28,8 @@ export type CloudKubernetesProvider = 'aks' | 'gke' | 'digitalocean' | 'lke';
 
 export interface CloudConfigBase<K> {
   clusterName: string;
+  contextName: string;
   kubernetesProvider?: K;
-  contextName?: string;
 }
 
 export interface GkeCloudConfig extends CloudConfigBase<'gke'> {

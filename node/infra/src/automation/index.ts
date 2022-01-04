@@ -7,20 +7,20 @@ import {
 import chalk from 'chalk';
 
 import { INFRA_DIR } from '../../dir.js';
+import { CloudKubernetesProvider } from '../lib/cloudConfig';
+import { withKubectl, loadKubeConfig } from '../lib/kubectl';
 import {
   getOutputProjectName,
   StackModule,
   StackOutputMap,
 } from '../lib/stackModule';
-import * as gkeClusterModule from '../stacks/gke-cluster/stack';
-import * as k8sTrifectaModule from '../stacks/k8s-trifecta/stack';
-import * as k8sIstioMeshModule from '../stacks/k8s-istio-mesh/stack';
-import * as gcpProjectModule from '../stacks/gcp-project/stack';
 import * as azureClusterModule from '../stacks/azure-cluster/stack';
-import * as linodeClusterModule from '../stacks/linode-cluster/stack';
 import * as doClusterModule from '../stacks/do-cluster/stack';
-import { CloudKubernetesProvider } from '../lib/cloudConfig';
-import { withKubectl, loadKubeConfig } from '../lib/kubectl';
+import * as gcpProjectModule from '../stacks/gcp-project/stack';
+import * as gkeClusterModule from '../stacks/gke-cluster/stack';
+import * as k8sIstioMeshModule from '../stacks/k8s-istio-mesh/stack';
+import * as k8sTrifectaModule from '../stacks/k8s-trifecta/stack';
+import * as linodeClusterModule from '../stacks/linode-cluster/stack';
 
 import { outputFormatter } from './outputFormatter';
 

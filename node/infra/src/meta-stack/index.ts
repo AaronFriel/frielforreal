@@ -3,17 +3,17 @@ import { all, output } from '@pulumi/pulumi';
 
 import { INFRA_DIR } from '../../dir';
 import { CloudKubernetesProvider } from '../lib/cloudConfig';
-import { LocalPulumiProgram } from '../lib/LocalPulumiProgram';
 import { mergeKubeConfigStrings } from '../lib/kubectl';
+import { LocalPulumiProgram } from '../lib/LocalPulumiProgram';
 import { MeshConfig } from '../lib/meshConfig';
+import * as aksClusterStack from '../stacks/azure-cluster/stack';
+import * as doClusterStack from '../stacks/do-cluster/stack';
 import * as gcpProjectStack from '../stacks/gcp-project/stack';
 import * as gkeClusterStack from '../stacks/gke-cluster/stack';
-import * as linodeClusterStack from '../stacks/linode-cluster/stack';
-import * as doClusterStack from '../stacks/do-cluster/stack';
-import * as aksClusterStack from '../stacks/azure-cluster/stack';
-import * as k8sTrifectaStack from '../stacks/k8s-trifecta/stack';
-import * as k8sTailscaleStack from '../stacks/k8s-tailscale/stack';
 import * as k8sLinkerdMeshStack from '../stacks/k8s-linkerd-mesh/stack';
+import * as k8sTailscaleStack from '../stacks/k8s-tailscale/stack';
+import * as k8sTrifectaStack from '../stacks/k8s-trifecta/stack';
+import * as linodeClusterStack from '../stacks/linode-cluster/stack';
 
 interface ClusterConfigBase {
   name: string;
@@ -66,7 +66,7 @@ export async function stack() {
       tailscalePort: 63000,
     },
     {
-      name: 'striking-sailfish',
+      name: 'absolute-weevil',
       provider: 'lke',
       region: 'us-central',
       tailscalePort: 63002,

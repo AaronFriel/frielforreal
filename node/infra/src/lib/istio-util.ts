@@ -1,6 +1,6 @@
 import { YZX } from '@frielforreal/yzx';
-import intoStream = require('into-stream');
 import * as pulumi from '@pulumi/pulumi';
+import intoStream = require('into-stream');
 import yaml from 'js-yaml';
 
 import { CloudKubernetesProvider } from './cloudConfig';

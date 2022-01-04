@@ -1,5 +1,5 @@
-import * as pulumi from '@pulumi/pulumi';
 import * as k8s from '@pulumi/kubernetes';
+import * as pulumi from '@pulumi/pulumi';
 
 import { getConfig } from '../../lib/config';
 import { MeshConfig } from '../../lib/meshConfig';
@@ -67,7 +67,7 @@ function multiclusterLink(config: MeshConfig) {
       probeSpec: {
         path: '/ready',
         period: '3s',
-        port: '4191',
+        port: '4192',
       },
       selector: {
         matchExpressions: [
@@ -212,6 +212,9 @@ function multiclusterLink(config: MeshConfig) {
         'mirror.linkerd.io/cluster-name': `${clusterName}`,
       },
       name: `linkerd-service-mirror-${clusterName}`,
+      annotations: {
+        'pulumi.com/skipAwait': 'true',
+      },
       namespace: 'linkerd-multicluster',
     },
     spec: {
@@ -269,12 +272,15 @@ function multiclusterLink(config: MeshConfig) {
         'mirror.linkerd.io/mirrored-gateway': 'true',
         'mirror.linkerd.io/cluster-name': `${clusterName}`,
       },
+      annotations: {
+        'pulumi.com/skipAwait': 'true',
+      },
     },
     spec: {
       ports: [
         {
           name: 'mc-probe',
-          port: 4191,
+          port: 4192,
           protocol: 'TCP',
         },
       ],

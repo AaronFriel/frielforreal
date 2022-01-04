@@ -1,7 +1,10 @@
-import * as pulumi from '@pulumi/pulumi';
 import * as linode from '@pulumi/linode';
-import { RandomPet } from '@pulumi/random';
+import * as pulumi from '@pulumi/pulumi';
 import { secret } from '@pulumi/pulumi';
+import { RandomPet } from '@pulumi/random';
+
+import { getConfig } from '../../lib/config';
+import { rewriteKubeconfig } from '../../lib/kubectl';
 
 export const workDir = __dirname;
 export const projectName = 'infra-linode-cluster';
@@ -18,6 +21,8 @@ export async function stack() {
   if (!pulumi.runtime.hasEngine()) {
     return;
   }
+
+  const { clusterName, contextName } = getConfig().cloud();
 
   const { region } = config();
 
@@ -38,7 +43,7 @@ export async function stack() {
       },
       pools: [
         {
-          type: 'g6-standard-4',
+          type: 'g6-dedicated-4',
           count: 1,
         },
       ],
@@ -47,9 +52,23 @@ export async function stack() {
   );
 
   return {
-    kubeconfig: secret(cluster.kubeconfig).apply((base64data) =>
-      base64data ? Buffer.from(base64data, 'base64').toString('utf-8') : '',
-    ),
+    kubeconfig: secret(cluster.kubeconfig).apply((base64kubeconfig) => {
+      if (pulumi.runtime.isDryRun()) {
+        return 'undefined';
+      }
+
+      if (!base64kubeconfig) {
+        throw new Error(
+          `Unable to retrieve kubeconfig for cluster ${clusterName}`,
+        );
+      }
+
+      const configText = Buffer.from(base64kubeconfig, 'base64').toString(
+        'utf-8',
+      );
+
+      return rewriteKubeconfig(configText, contextName);
+    }),
     clusterName: cluster.label,
     contextName: pulumi.interpolate`lke${cluster.id}-ctx`,
   };

@@ -1,6 +1,6 @@
-import { Service } from '@pulumi/gcp/projects';
-import { getBillingAccount, Project } from '@pulumi/gcp/organizations';
 import { Network } from '@pulumi/gcp/compute';
+import { getBillingAccount, Project } from '@pulumi/gcp/organizations';
+import { Service } from '@pulumi/gcp/projects';
 import { Router } from '@pulumi/google-native/compute/v1';
 import * as pulumi from '@pulumi/pulumi';
 import * as random from '@pulumi/random';
