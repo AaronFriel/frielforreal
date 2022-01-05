@@ -243,6 +243,7 @@ function multiclusterLink(config: MeshConfig) {
                 '-log-level=info',
                 '-event-requeue-limit=3',
                 '-namespace=linkerd-multicluster',
+                '-enable-headless-services',
                 `${clusterName}`,
               ],
               image: 'cr.l5d.io/linkerd/controller:edge-21.12.4',
